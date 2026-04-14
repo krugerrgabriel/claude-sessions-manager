@@ -63,7 +63,7 @@ São **15–30 minutos só pra começar a produzir**. E quando o terminal fecha,
 ### 1️⃣ Clone o repositório
 
 ```bash
-git clone https://github.com/SEU_USUARIO/claude-sessions-manager.git
+git clone https://github.com/krugerrgabriel/claude-sessions-manager.git
 cd claude-sessions-manager
 ```
 
