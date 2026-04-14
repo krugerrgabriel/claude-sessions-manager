@@ -222,10 +222,34 @@ code, kbd, .mono { font-family: var(--ff-mono); }
 }
 
 .sidebar-footer {
-  padding: var(--sp-3) var(--sp-4);
+  padding: var(--sp-2) var(--sp-2) var(--sp-3);
   border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
 }
+.repo-link {
+  display: grid;
+  grid-template-columns: 16px 1fr 12px;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.repo-link:hover { background: var(--surface); color: var(--text); }
+.repo-link:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -1px; }
+.repo-link .icon { width: 16px; height: 16px; color: var(--text-dim); }
+.repo-link:hover .icon:first-of-type { color: var(--text); }
+.repo-link .external { width: 12px; height: 12px; }
+.repo-link:hover .external { color: var(--accent); }
+
 .hint {
+  padding: 4px 10px 0;
   font-size: 11px;
   color: var(--text-dim);
   display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
@@ -321,6 +345,10 @@ kbd {
 .icon-btn:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 .icon-btn .icon { width: 17px; height: 17px; }
 
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+.icon-btn.spinning { pointer-events: none; color: var(--accent); border-color: var(--accent); }
+.icon-btn.spinning .icon { animation: cs-spin 650ms linear infinite; transform-origin: 50% 50%; }
+
 .mobile-menu { display: none; }
 
 .main-sub {
@@ -341,6 +369,49 @@ kbd {
   font-size: 12px; color: var(--text-dim);
   font-variant-numeric: tabular-nums;
 }
+
+.sub-right {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sort-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.sort-wrap .sort-icon {
+  position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%);
+  width: 13px; height: 13px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.sort-wrap .sort-chev {
+  position: absolute; right: 8px; top: 50%;
+  transform: translateY(-50%);
+  width: 12px; height: 12px;
+  color: var(--text-dim);
+  pointer-events: none;
+}
+.sort-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: 500 12px var(--ff-ui);
+  padding: 6px 26px 6px 30px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  outline: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.sort-select:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.sort-select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.sort-select option { background: var(--surface-2); color: var(--text); }
 
 /* =========================================================================
    Content
@@ -718,7 +789,95 @@ kbd {
   font-weight: 600;
 }
 .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.warning {
+  background: var(--favorite);
+  color: #1a1a1c;
+  border-color: var(--favorite);
+  font-weight: 600;
+}
+.btn.warning:hover { filter: brightness(1.08); }
+.btn.danger {
+  background: var(--danger);
+  color: #1a1a1c;
+  border-color: var(--danger);
+  font-weight: 600;
+}
+.btn.danger:hover { filter: brightness(1.08); }
 .btn .icon { width: 15px; height: 15px; }
+
+/* =========================================================================
+   Confirm dialog
+   ========================================================================= */
+
+.confirm-card { max-width: 460px; gap: var(--sp-4); }
+.confirm-head { display: flex; gap: var(--sp-3); align-items: flex-start; }
+.confirm-head h2 { margin: 0 0 4px; font-size: 15px; }
+.confirm-message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.confirm-icon {
+  flex-shrink: 0;
+  width: 38px; height: 38px;
+  display: grid; place-items: center;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.confirm-icon .icon { width: 18px; height: 18px; }
+.confirm-icon.warning { background: var(--favorite-dim); color: var(--favorite); border-color: rgba(242,184,75,.35); }
+.confirm-icon.danger  { background: var(--danger-dim);   color: var(--danger);   border-color: rgba(224,106,98,.35); }
+
+/* =========================================================================
+   Tooltip
+   ========================================================================= */
+
+.tooltip-bubble {
+  position: fixed;
+  pointer-events: none;
+  z-index: 1000;
+  top: 0; left: 0;
+  max-width: 280px;
+  padding: 6px 10px;
+  background: var(--surface-3);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-md);
+  font-size: 11.5px;
+  font-weight: 500;
+  font-family: var(--ff-ui);
+  line-height: 1.4;
+  letter-spacing: -0.002em;
+  white-space: normal;
+  word-wrap: break-word;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 140ms var(--ease), transform 140ms var(--ease);
+}
+.tooltip-bubble.show { opacity: 1; transform: translateY(0); }
+.tooltip-bubble::before {
+  content: "";
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 8px; height: 8px;
+  background: var(--surface-3);
+  border-left: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border-strong);
+}
+.tooltip-bubble.flip::before {
+  top: auto;
+  bottom: -5px;
+  border-left: 0;
+  border-top: 0;
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
 
 /* =========================================================================
    Toast

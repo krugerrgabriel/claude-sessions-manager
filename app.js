@@ -7,6 +7,7 @@
     filter: 'all',       // all | favorites | trash
     project: null,       // cwd of active project, null = all
     query: '',
+    sort: localStorage.getItem('cs:sort') || 'recent',
     editing: null,
     collapsed: new Set(loadCollapsed()),
   };
@@ -125,6 +126,112 @@
     toast._t = setTimeout(() => { el.className = 'toast hidden'; }, opts.duration || 2400);
   }
 
+  // ----- Confirm dialog (replaces window.confirm) -----
+  function confirmDialog({ title, message, confirmLabel = 'Confirmar', variant = 'default' }) {
+    return new Promise(resolve => {
+      const modal = $('#confirm-modal');
+      const okBtn = $('#confirm-ok');
+      const iconEl = $('#confirm-icon');
+      $('#confirm-title').textContent = title;
+      $('#confirm-message').textContent = message;
+      okBtn.textContent = confirmLabel;
+      okBtn.className = 'btn ' + (variant === 'danger' ? 'danger' : variant === 'warning' ? 'warning' : 'primary');
+      iconEl.className = 'confirm-icon ' + variant;
+
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      setTimeout(() => okBtn.focus(), 20);
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        okBtn.removeEventListener('click', onConfirm);
+        modal.removeEventListener('click', onBackdrop);
+        document.removeEventListener('keydown', onKey, true);
+      };
+      const onConfirm = () => { cleanup(); resolve(true); };
+      const onBackdrop = (e) => {
+        if (e.target.closest('[data-confirm-cancel]')) { cleanup(); resolve(false); }
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); cleanup(); resolve(false); }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); cleanup(); resolve(true); }
+      };
+      okBtn.addEventListener('click', onConfirm);
+      modal.addEventListener('click', onBackdrop);
+      document.addEventListener('keydown', onKey, true);
+    });
+  }
+
+  // ----- Tooltip (delegated, singleton bubble) -----
+  const tooltip = (() => {
+    const el = $('#tooltip');
+    let showTimer = null;
+    let current = null;
+
+    function position(target) {
+      const r = target.getBoundingClientRect();
+      // Tentative top-center position below the element
+      el.style.visibility = 'hidden';
+      el.style.left = '0px';
+      el.style.top = '0px';
+      el.classList.add('show');
+      const tr = el.getBoundingClientRect();
+      let top = r.bottom + 8;
+      let left = r.left + (r.width - tr.width) / 2;
+      // Clamp to viewport
+      const margin = 6;
+      if (left < margin) left = margin;
+      if (left + tr.width > window.innerWidth - margin) left = window.innerWidth - tr.width - margin;
+      // Flip above if it overflows below
+      let flipped = false;
+      if (top + tr.height > window.innerHeight - margin) {
+        top = r.top - tr.height - 8;
+        flipped = true;
+      }
+      el.classList.toggle('flip', flipped);
+      el.style.left = left + 'px';
+      el.style.top = top + 'px';
+      el.style.visibility = '';
+    }
+
+    function show(target) {
+      const text = target.getAttribute('data-tooltip');
+      if (!text) return;
+      el.textContent = text;
+      current = target;
+      position(target);
+    }
+
+    function hide() {
+      clearTimeout(showTimer);
+      showTimer = null;
+      current = null;
+      el.classList.remove('show');
+    }
+
+    document.addEventListener('mouseover', (e) => {
+      const t = e.target.closest('[data-tooltip]');
+      if (!t || t === current) return;
+      clearTimeout(showTimer);
+      // Short delay to avoid flicker when sweeping the cursor
+      showTimer = setTimeout(() => show(t), 280);
+    });
+    document.addEventListener('mouseout', (e) => {
+      const t = e.target.closest('[data-tooltip]');
+      if (!t) return;
+      // Only hide if the pointer actually left the tooltip target
+      if (e.relatedTarget && t.contains(e.relatedTarget)) return;
+      hide();
+    });
+    document.addEventListener('mousedown', hide, true);
+    document.addEventListener('focusout', hide, true);
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('blur', hide);
+
+    return { hide };
+  })();
+
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -158,11 +265,32 @@
 
   function visibleSessions() {
     const q = state.query.trim().toLowerCase();
-    return state.sessions.filter(s => {
+    const filtered = state.sessions.filter(s => {
       if (!baseVisible(s)) return false;
       if (state.project && projectKey(s) !== state.project) return false;
       return matchesQuery(s, q);
     });
+    return applySort(filtered);
+  }
+
+  function applySort(list) {
+    const arr = [...list];
+    const byNum = (pick) => (a, b) => (pick(b) || 0) - (pick(a) || 0);
+    const byNumAsc = (pick) => (a, b) => (pick(a) || 0) - (pick(b) || 0);
+    switch (state.sort) {
+      case 'oldest':        arr.sort((a, b) => a.mtime - b.mtime); break;
+      case 'tokens-desc':   arr.sort(byNum(s => s.context_tokens)); break;
+      case 'tokens-asc':    arr.sort(byNumAsc(s => s.context_tokens || Infinity)); break;
+      case 'size-desc':     arr.sort(byNum(s => s.size)); break;
+      case 'name': {
+        const label = s => (s.name || s.first_message || s.id).toLowerCase();
+        arr.sort((a, b) => label(a).localeCompare(label(b), 'pt-BR'));
+        break;
+      }
+      case 'recent':
+      default:              arr.sort((a, b) => b.mtime - a.mtime);
+    }
+    return arr;
   }
 
   function countByFilter(filter) {
@@ -209,7 +337,7 @@
       const active = state.project === p.key;
       const short = projectShortName(p.cwd) || p.folder;
       return `
-        <button class="nav-item ${active ? 'active' : ''}" data-project="${escapeHtml(p.key)}" type="button" title="${escapeHtml(p.cwd || p.folder)}">
+        <button class="nav-item ${active ? 'active' : ''}" data-project="${escapeHtml(p.key)}" type="button" data-tooltip="${escapeHtml(p.cwd || p.folder)}">
           ${icon('folder')}
           <span>${escapeHtml(short)}</span>
           <span class="nav-count">${p.count}</span>
@@ -226,7 +354,7 @@
     const scope = state.project ? projectShortName(state.project) : 'Todos os projetos';
     $('#crumb-scope').textContent = scope;
     const total = state.sessions.length;
-    $('#result-count').textContent = `${listLen} de ${total} sessão${total !== 1 ? 'ões' : ''}${state.query ? ` · filtro "${state.query}"` : ''}`;
+    $('#result-count').textContent = `${listLen} de ${total} ${total === 1 ? 'sessão' : 'sessões'}${state.query ? ` · filtro "${state.query}"` : ''}`;
   }
 
   function renderEmpty() {
@@ -265,22 +393,21 @@
         : '');
 
     const meta = [];
-    if (s.git_branch) meta.push(`<span class="meta-pill branch" title="Branch">${icon('branch')}${escapeHtml(truncate(s.git_branch, 28))}</span>`);
-    if (s.context_tokens) meta.push(`<span class="meta-pill tokens ${tokenClass(s.context_tokens)}" title="Contexto ao fim da sessão: ${s.context_tokens.toLocaleString('pt-BR')} tokens">${icon('database')}${prettyTokens(s.context_tokens)}</span>`);
-    if (s.size) meta.push(`<span class="meta-pill" title="Tamanho do arquivo .jsonl">${icon('file')}${prettySize(s.size)}</span>`);
-    if (s.line_count) meta.push(`<span class="meta-pill" title="${s.line_count} linhas no .jsonl">${icon('message')}${s.line_count}</span>`);
-    meta.push(`<span class="meta-pill" title="${fullDate(s.mtime)}">${icon('clock')}${prettyDate(s.mtime)}</span>`);
+    if (s.git_branch) meta.push(`<span class="meta-pill branch" data-tooltip="Branch atual">${icon('branch')}${escapeHtml(truncate(s.git_branch, 28))}</span>`);
+    if (s.context_tokens) meta.push(`<span class="meta-pill tokens ${tokenClass(s.context_tokens)}" data-tooltip="Contexto ao fim da sessão: ${s.context_tokens.toLocaleString('pt-BR')} tokens">${icon('database')}${prettyTokens(s.context_tokens)}</span>`);
+    if (s.size) meta.push(`<span class="meta-pill" data-tooltip="Tamanho da sessão em disco">${icon('file')}${prettySize(s.size)}</span>`);
+    meta.push(`<span class="meta-pill" data-tooltip="${fullDate(s.mtime)}">${icon('clock')}${prettyDate(s.mtime)}</span>`);
 
     const actions = s.deleted
       ? `
-        <button class="card-action success" data-action="restore" title="Restaurar" aria-label="Restaurar">${icon('rotate')}</button>
-        <button class="card-action danger" data-action="purge" title="Excluir permanentemente" aria-label="Excluir permanentemente">${icon('x')}</button>
+        <button class="card-action success" data-action="restore" data-tooltip="Restaurar" aria-label="Restaurar">${icon('rotate')}</button>
+        <button class="card-action danger" data-action="purge" data-tooltip="Excluir permanentemente" aria-label="Excluir permanentemente">${icon('x')}</button>
       `
       : `
-        <button class="card-action primary" data-action="copy" title="Copiar claude --resume ${s.id}">${icon('copy')}Copiar comando</button>
-        <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" title="${s.favorite ? 'Desfavoritar' : 'Favoritar'}" aria-label="${s.favorite ? 'Desfavoritar' : 'Favoritar'}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
-        <button class="card-action" data-action="edit" title="Editar nome e descrição" aria-label="Editar">${icon('edit')}</button>
-        <button class="card-action danger" data-action="delete" title="Mover para lixeira" aria-label="Mover para lixeira">${icon('trash')}</button>
+        <button class="card-action primary" data-action="copy" data-tooltip="Copia claude --resume ${s.id}">${icon('copy')}Copiar comando</button>
+        <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" data-tooltip="${s.favorite ? 'Desfavoritar' : 'Favoritar'}" aria-label="${s.favorite ? 'Desfavoritar' : 'Favoritar'}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
+        <button class="card-action" data-action="edit" data-tooltip="Editar nome e descrição" aria-label="Editar">${icon('edit')}</button>
+        <button class="card-action danger" data-action="delete" data-tooltip="Mover para lixeira" aria-label="Mover para lixeira">${icon('trash')}</button>
       `;
 
     return `
@@ -370,7 +497,13 @@
     }
     if (action === 'edit') { openEditor(s); return; }
     if (action === 'delete') {
-      if (!confirm('Mover esta sessão para a lixeira?')) return;
+      const ok = await confirmDialog({
+        title: 'Mover para a lixeira?',
+        message: 'Você pode restaurar quando quiser pela aba Lixeira. Nada é apagado do disco.',
+        confirmLabel: 'Mover para lixeira',
+        variant: 'warning',
+      });
+      if (!ok) return;
       await patchSession(s.id, { deleted: true });
       s.deleted = true;
       render();
@@ -385,7 +518,13 @@
       return;
     }
     if (action === 'purge') {
-      if (!confirm(`Excluir permanentemente a sessão ${s.id.slice(0,8)}?\n\nO arquivo .jsonl será apagado do disco — não há como recuperar.`)) return;
+      const ok = await confirmDialog({
+        title: 'Excluir permanentemente?',
+        message: `A sessão ${s.id.slice(0,8)} vai ser apagada do disco. Essa ação não pode ser desfeita.`,
+        confirmLabel: 'Excluir definitivamente',
+        variant: 'danger',
+      });
+      if (!ok) return;
       try {
         await deleteSession(s.id);
         state.sessions = state.sessions.filter(x => x.id !== s.id);
@@ -537,14 +676,30 @@
     renderContent();
   });
 
-  $('#refresh').addEventListener('click', () => {
-    $('#refresh').querySelector('.icon').style.animation = 'none';
-    // trigger reflow for restart
-    requestAnimationFrame(() => {
-      $('#refresh').querySelector('.icon').style.animation = 'popIn 400ms var(--ease)';
-    });
-    load();
+  $('#refresh').addEventListener('click', async () => {
+    const btn = $('#refresh');
+    if (btn.classList.contains('spinning')) return;
+    btn.classList.add('spinning');
+    const start = Date.now();
+    try {
+      await load();
+    } finally {
+      // Ensure at least one full spin for visible feedback
+      const elapsed = Date.now() - start;
+      const wait = Math.max(0, 650 - elapsed);
+      setTimeout(() => btn.classList.remove('spinning'), wait);
+    }
   });
+
+  $('#sort-select').addEventListener('change', (e) => {
+    state.sort = e.target.value;
+    try { localStorage.setItem('cs:sort', state.sort); } catch (_) {}
+    renderContent();
+  });
+
+  // Restore saved sort into the select on load
+  const sortSel = $('#sort-select');
+  if (sortSel) sortSel.value = state.sort;
 
   $('#edit-save').addEventListener('click', saveEditor);
 

@@ -30,6 +30,11 @@ log "Recarregando Apache"
 systemctl reload apache2 || true
 ok "Apache config removido"
 
+log "Removendo comando 'claude-sessions' do terminal"
+BIN_DIR="${BIN_DIR:-/usr/local/bin}"
+rm -f "$BIN_DIR/claude-sessions" "$BIN_DIR/claude-sessions-manager"
+ok "Comando removido"
+
 if [ "$PURGE" = "yes" ]; then
   if [ -d "$INSTALL_DIR" ]; then
     log "Removendo $INSTALL_DIR (inclui metadata.json)"

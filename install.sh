@@ -152,10 +152,35 @@ else
   warn "API não respondeu no smoke test (veja /var/log/apache2/error.log)"
 fi
 
+# ---------------------------------------------------------------------------
+# 7. CLI shortcut (opens the dashboard in the default browser)
+# ---------------------------------------------------------------------------
+log "Criando comando de terminal: claude-sessions"
+BIN_DIR="${BIN_DIR:-/usr/local/bin}"
+BIN_FILE="$BIN_DIR/claude-sessions"
+cat > "$BIN_FILE" <<EOF
+#!/usr/bin/env bash
+# Abre o Claude Sessions Manager no navegador padrão.
+# Gerado automaticamente pelo install.sh em $(date -Iseconds).
+URL="http://localhost$URL_PATH/"
+if command -v xdg-open >/dev/null 2>&1; then
+  xdg-open "\$URL" >/dev/null 2>&1 &
+elif command -v open >/dev/null 2>&1; then
+  open "\$URL" &
+else
+  echo "Abra manualmente: \$URL"
+fi
+EOF
+chmod 0755 "$BIN_FILE"
+# Convenience alias with the full name
+ln -sf "$BIN_FILE" "$BIN_DIR/claude-sessions-manager"
+ok "Comando instalado em $BIN_FILE (alias: claude-sessions-manager)"
+
 echo
 echo "────────────────────────────────────────────────────────────"
 ok  "Instalação concluída"
 echo
-echo "  🌐  Acesse:    http://localhost$URL_PATH/"
-echo "  🗑   Desinstalar: sudo ./uninstall.sh"
+echo "  🌐  Acesse:   http://localhost$URL_PATH/"
+echo "  💻  Terminal: \$ claude-sessions    (abre no navegador)"
+echo "  🗑  Remover: sudo ./uninstall.sh"
 echo "────────────────────────────────────────────────────────────"
