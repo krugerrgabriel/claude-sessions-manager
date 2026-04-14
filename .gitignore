@@ -1,0 +1,20 @@
+# Runtime data — user-specific metadata and cache
+data/
+cache/
+
+# Temp files from atomic writes
+*.tmp
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*~
+
+# Python cache (if any tooling is added later)
+__pycache__/
+*.pyc

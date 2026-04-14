@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="pt-br" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <title>Claude Sessions</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27%23D97757%27%3E%3Cpath%20d%3D%27M12%202L2%208l10%206%2010-6-10-6zM2%2012l10%206%2010-6M2%2016l10%206%2010-6%27%20stroke%3D%27%23D97757%27%20stroke-width%3D%271.8%27%20fill%3D%27none%27%20stroke-linejoin%3D%27round%27%2F%3E%3C%2Fsvg%3E" />
+</head>
+<body>
+  <!-- SVG icon sprite (lucide-inspired) -->
+  <svg xmlns="http://www.w3.org/2000/svg" class="sr-only" aria-hidden="true" style="position:absolute;width:0;height:0">
+    <defs>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"></path><path d="M3 21v-5h5"></path></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"></polygon></symbol>
+      <symbol id="i-star-filled" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"></polygon></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6 18 20a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></symbol>
+      <symbol id="i-rotate" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v5h5"></path></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"></path></symbol>
+      <symbol id="i-branch" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"></line><circle cx="18" cy="6" r="3"></circle><circle cx="6" cy="18" r="3"></circle><path d="M18 9a9 9 0 0 1-9 9"></path></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></symbol>
+      <symbol id="i-message" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></symbol>
+      <symbol id="i-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14a9 3 0 0 0 18 0V5"></path><path d="M3 12a9 3 0 0 0 18 0"></path></symbol>
+      <symbol id="i-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></symbol>
+    </defs>
+  </svg>
+
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="brand">
+          <span class="logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+              <path d="M12 2 2 8l10 6 10-6-10-6z"/><path d="M2 14l10 6 10-6"/>
+            </svg>
+          </span>
+          <div class="brand-text">
+            <strong>Claude Sessions</strong>
+            <span class="brand-sub">gerenciador local</span>
+          </div>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Navegação principal">
+        <div class="nav-section">
+          <h3 class="nav-heading">Visualizar</h3>
+          <button class="nav-item active" data-filter="all" type="button">
+            <svg class="icon"><use href="#i-inbox"></use></svg>
+            <span>Todas</span>
+            <span class="nav-count" data-count="all">—</span>
+          </button>
+          <button class="nav-item" data-filter="favorites" type="button">
+            <svg class="icon"><use href="#i-star"></use></svg>
+            <span>Favoritas</span>
+            <span class="nav-count" data-count="favorites">—</span>
+          </button>
+          <button class="nav-item" data-filter="trash" type="button">
+            <svg class="icon"><use href="#i-trash"></use></svg>
+            <span>Lixeira</span>
+            <span class="nav-count" data-count="trash">—</span>
+          </button>
+        </div>
+
+        <div class="nav-section">
+          <h3 class="nav-heading">Projetos</h3>
+          <div id="project-list" class="project-list">
+            <div class="skeleton-nav"></div>
+            <div class="skeleton-nav"></div>
+            <div class="skeleton-nav"></div>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="hint">
+          <kbd>/</kbd> focar busca · <kbd>Esc</kbd> fechar
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="main-header">
+        <button class="icon-btn mobile-menu" id="toggle-sidebar" aria-label="Alternar menu" type="button">
+          <svg class="icon"><use href="#i-menu"></use></svg>
+        </button>
+
+        <div class="search-wrap">
+          <svg class="icon search-icon"><use href="#i-search"></use></svg>
+          <input id="search" type="search" placeholder="Buscar título, descrição, projeto, branch, id…" autocomplete="off" spellcheck="false" />
+          <kbd class="search-kbd">/</kbd>
+        </div>
+
+        <div class="header-actions">
+          <button id="refresh" class="icon-btn" title="Recarregar (Ctrl+R)" aria-label="Recarregar sessões" type="button">
+            <svg class="icon"><use href="#i-refresh"></use></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="main-sub">
+        <div class="crumbs">
+          <span id="crumb-view">Todas as sessões</span>
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <span id="crumb-scope">Todos os projetos</span>
+        </div>
+        <div class="result-count" id="result-count"></div>
+      </div>
+
+      <section class="content" id="content">
+        <div class="grid" id="skeleton-grid">
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+          <div class="skeleton-card"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title">Editar sessão</h2>
+        <button class="icon-btn" data-close aria-label="Fechar" type="button">
+          <svg class="icon"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <label class="field">
+        <span>Nome</span>
+        <input id="edit-name" type="text" maxlength="120" placeholder="Ex: Refactor financeiro" />
+      </label>
+      <label class="field">
+        <span>Descrição</span>
+        <textarea id="edit-desc" rows="5" maxlength="1000" placeholder="Anotações sobre o contexto desta sessão…"></textarea>
+      </label>
+      <div class="modal-meta">
+        <div><span class="muted">ID:</span> <code id="edit-id"></code></div>
+        <div><span class="muted">Projeto:</span> <span id="edit-cwd"></span></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-close type="button">Cancelar</button>
+        <button id="edit-save" class="btn primary" type="button">
+          <svg class="icon"><use href="#i-check"></use></svg>
+          Salvar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
