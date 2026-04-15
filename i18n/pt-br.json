@@ -79,5 +79,10 @@
   "date.now": "agora",
   "date.min": "min",
   "date.h": "h",
-  "date.d": "d"
+  "date.d": "d",
+  "update.checking": "Verificando atualizações…",
+  "update.upToDate": "Atualizado (v{local})",
+  "update.available": "Atualização disponível: v{local} → v{latest}",
+  "update.error": "Não foi possível verificar atualizações",
+  "update.copied": "Comando copiado (v{local} → v{latest}): <span class=\"cmd\">{cmd}</span>"
 }

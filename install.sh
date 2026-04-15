@@ -78,7 +78,7 @@ mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/cache"
 # ---------------------------------------------------------------------------
 if [ "$(realpath "$SRC_DIR")" != "$(realpath "$INSTALL_DIR")" ]; then
   log "Copying files from $SRC_DIR"
-  for f in index.html style.css app.js app.wsgi; do
+  for f in index.html style.css app.js app.wsgi VERSION; do
     if [ ! -f "$SRC_DIR/$f" ]; then
       echo "✗ missing file: $SRC_DIR/$f" >&2
       exit 1

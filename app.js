@@ -827,6 +827,93 @@
     getAvailable: () => [...I18N_AVAILABLE],
   };
 
+  // ----- Update checker -----
+  const GITHUB_REPO = 'krugerrgabriel/claude-sessions-manager';
+  const UPDATE_CMD = 'cd claude-sessions-manager && git pull && sudo ./install.sh';
+  const UPDATE_CACHE_KEY = 'cs:updateCheck';
+  const UPDATE_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
+
+  async function fetchLocalVersion() {
+    try {
+      const res = await fetch('VERSION', { cache: 'no-store' });
+      if (!res.ok) return null;
+      return (await res.text()).trim().replace(/^v/i, '');
+    } catch (_) { return null; }
+  }
+
+  async function fetchLatestRelease() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(UPDATE_CACHE_KEY) || 'null');
+      if (cached && Date.now() - cached.ts < UPDATE_CACHE_TTL_MS) return cached.tag;
+    } catch (_) {}
+    try {
+      const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const tag = String(json.tag_name || '').trim().replace(/^v/i, '');
+      if (!tag) return null;
+      try { localStorage.setItem(UPDATE_CACHE_KEY, JSON.stringify({ ts: Date.now(), tag })); } catch (_) {}
+      return tag;
+    } catch (_) { return null; }
+  }
+
+  function semverGt(a, b) {
+    const pa = a.split('.').map(n => parseInt(n, 10) || 0);
+    const pb = b.split('.').map(n => parseInt(n, 10) || 0);
+    const max = Math.max(pa.length, pb.length);
+    for (let i = 0; i < max; i++) {
+      const x = pa[i] || 0, y = pb[i] || 0;
+      if (x > y) return true;
+      if (x < y) return false;
+    }
+    return false;
+  }
+
+  async function checkForUpdates() {
+    const btn = $('#update-btn');
+    if (!btn) return;
+    const badge = $('.update-badge', btn);
+    btn.setAttribute('data-tooltip', t('update.checking'));
+    const [local, latest] = await Promise.all([fetchLocalVersion(), fetchLatestRelease()]);
+    btn.dataset.local = local || '';
+    btn.dataset.latest = latest || '';
+    if (!local || !latest) {
+      btn.dataset.state = 'error';
+      btn.setAttribute('data-tooltip', t('update.error'));
+      return;
+    }
+    if (semverGt(latest, local)) {
+      btn.dataset.state = 'outdated';
+      btn.classList.add('outdated');
+      badge.classList.remove('hidden');
+      btn.setAttribute('data-tooltip', t('update.available', { local, latest }));
+    } else {
+      btn.dataset.state = 'upToDate';
+      btn.classList.remove('outdated');
+      badge.classList.add('hidden');
+      btn.setAttribute('data-tooltip', t('update.upToDate', { local }));
+    }
+  }
+
+  function wireUpdateButton() {
+    const btn = $('#update-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const state = btn.dataset.state;
+      const local = btn.dataset.local || '?';
+      const latest = btn.dataset.latest || '?';
+      if (state === 'outdated') {
+        const ok = await copyToClipboard(UPDATE_CMD);
+        if (ok) toast(t('update.copied', { cmd: escapeHtml(UPDATE_CMD), local, latest }), 'success', { duration: 4200 });
+        else toast(t('toast.copyFailed'), 'error');
+      } else if (state === 'upToDate') {
+        toast(t('update.upToDate', { local }), 'success');
+      } else {
+        toast(t('update.error'), 'error');
+      }
+    });
+  }
+
   // ----- Boot -----
   async function boot() {
     try {
@@ -851,7 +938,9 @@
     renderLangSwitch();
     applyI18n();
     syncLangButtons();
+    wireUpdateButton();
     load();
+    checkForUpdates();
   }
 
   boot();

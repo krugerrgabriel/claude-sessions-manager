@@ -79,5 +79,10 @@
   "date.now": "たった今",
   "date.min": "分",
   "date.h": "時間",
-  "date.d": "日"
+  "date.d": "日",
+  "update.checking": "更新を確認中…",
+  "update.upToDate": "最新版です (v{local})",
+  "update.available": "更新あり: v{local} → v{latest}",
+  "update.error": "更新を確認できませんでした",
+  "update.copied": "コマンドをコピーしました (v{local} → v{latest}): <span class=\"cmd\">{cmd}</span>"
 }

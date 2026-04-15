@@ -79,5 +79,10 @@
   "date.now": "刚刚",
   "date.min": "分钟",
   "date.h": "小时",
-  "date.d": "天"
+  "date.d": "天",
+  "update.checking": "正在检查更新…",
+  "update.upToDate": "已是最新版本 (v{local})",
+  "update.available": "可用更新:v{local} → v{latest}",
+  "update.error": "无法检查更新",
+  "update.copied": "命令已复制 (v{local} → v{latest}):<span class=\"cmd\">{cmd}</span>"
 }

@@ -1,0 +1,47 @@
+name: Sync VERSION on release
+
+# Keeps the root VERSION file in sync with the latest published GitHub Release.
+# Triggered whenever a release is published, edited or republished.
+# Writes the release tag (without a leading "v") to VERSION and commits.
+
+on:
+  release:
+    types: [published, edited, released]
+
+permissions:
+  contents: write
+
+jobs:
+  sync-version:
+    runs-on: ubuntu-latest
+    # Skip drafts and prereleases — only sync the canonical "latest" release
+    if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Resolve version from tag
+        id: ver
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved VERSION='$VERSION' from tag '$TAG'"
+
+      - name: Write VERSION file
+        run: |
+          echo "${{ steps.ver.outputs.version }}" > VERSION
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet VERSION; then
+            echo "VERSION already matches release — nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION
+          git commit -m "chore: bump VERSION to ${{ steps.ver.outputs.version }}"
+          git push

@@ -79,5 +79,10 @@
   "date.now": "방금",
   "date.min": "분",
   "date.h": "시간",
-  "date.d": "일"
+  "date.d": "일",
+  "update.checking": "업데이트 확인 중…",
+  "update.upToDate": "최신 버전 (v{local})",
+  "update.available": "업데이트 사용 가능: v{local} → v{latest}",
+  "update.error": "업데이트를 확인할 수 없음",
+  "update.copied": "명령 복사됨 (v{local} → v{latest}): <span class=\"cmd\">{cmd}</span>"
 }
