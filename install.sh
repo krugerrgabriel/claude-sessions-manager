@@ -45,24 +45,24 @@ echo "  URL path     : $URL_PATH"
 echo
 
 if [ ! -d "$PROJECTS_DIR" ]; then
-  warn "$PROJECTS_DIR não existe ainda — sessões só vão aparecer depois que você rodar o Claude Code."
+  warn "$PROJECTS_DIR does not exist yet — sessions will only appear after you run Claude Code."
 fi
 
 # ---------------------------------------------------------------------------
 # 1. Dependencies
 # ---------------------------------------------------------------------------
-log "Verificando dependências"
+log "Checking dependencies"
 MISSING=()
 dpkg -s apache2 >/dev/null 2>&1 || MISSING+=(apache2)
 dpkg -s libapache2-mod-wsgi-py3 >/dev/null 2>&1 || MISSING+=(libapache2-mod-wsgi-py3)
 command -v python3 >/dev/null 2>&1 || MISSING+=(python3)
 
 if [ ${#MISSING[@]} -gt 0 ]; then
-  log "Instalando: ${MISSING[*]}"
+  log "Installing: ${MISSING[*]}"
   apt-get update -qq
   DEBIAN_FRONTEND=noninteractive apt-get install -y -qq "${MISSING[@]}"
 else
-  ok "apache2 + mod_wsgi + python3 já instalados"
+  ok "apache2 + mod_wsgi + python3 already installed"
 fi
 
 a2enmod wsgi >/dev/null 2>&1 || true
@@ -70,30 +70,39 @@ a2enmod wsgi >/dev/null 2>&1 || true
 # ---------------------------------------------------------------------------
 # 2. Directory structure
 # ---------------------------------------------------------------------------
-log "Criando diretórios"
+log "Creating directories"
 mkdir -p "$INSTALL_DIR/data" "$INSTALL_DIR/cache"
 
 # ---------------------------------------------------------------------------
 # 3. Copy application files (avoid copying onto itself)
 # ---------------------------------------------------------------------------
 if [ "$(realpath "$SRC_DIR")" != "$(realpath "$INSTALL_DIR")" ]; then
-  log "Copiando arquivos de $SRC_DIR"
+  log "Copying files from $SRC_DIR"
   for f in index.html style.css app.js app.wsgi; do
     if [ ! -f "$SRC_DIR/$f" ]; then
-      echo "✗ arquivo faltando: $SRC_DIR/$f" >&2
+      echo "✗ missing file: $SRC_DIR/$f" >&2
       exit 1
     fi
     install -m 0644 "$SRC_DIR/$f" "$INSTALL_DIR/$f"
   done
+
+  if [ -d "$SRC_DIR/i18n" ]; then
+    log "Copying i18n/ dictionaries"
+    install -d -m 0755 "$INSTALL_DIR/i18n"
+    install -m 0644 "$SRC_DIR/i18n/"*.json "$INSTALL_DIR/i18n/"
+  else
+    echo "✗ missing directory: $SRC_DIR/i18n" >&2
+    exit 1
+  fi
 else
-  ok "Arquivos já estão em $INSTALL_DIR (sem copiar)"
+  ok "Files already in $INSTALL_DIR (skipping copy)"
 fi
 
 # ---------------------------------------------------------------------------
 # 4. Permissions
 #    Everything owned by the target user; data/ and cache/ writable by www-data.
 # ---------------------------------------------------------------------------
-log "Ajustando permissões"
+log "Adjusting permissions"
 chown -R "$TARGET_USER:$TARGET_USER" "$INSTALL_DIR"
 chgrp www-data "$INSTALL_DIR/data" "$INSTALL_DIR/cache"
 chmod 775 "$INSTALL_DIR/data" "$INSTALL_DIR/cache"
@@ -101,7 +110,7 @@ chmod 775 "$INSTALL_DIR/data" "$INSTALL_DIR/cache"
 # ---------------------------------------------------------------------------
 # 5. Apache configuration
 # ---------------------------------------------------------------------------
-log "Gerando Apache config"
+log "Generating Apache config"
 CONF_FILE="/etc/apache2/conf-available/claude-sessions.conf"
 cat > "$CONF_FILE" <<EOF
 # Claude Sessions — dashboard for managing Claude Code sessions
@@ -126,15 +135,15 @@ SetEnv CLAUDE_SESSIONS_PROJECTS_DIR "$PROJECTS_DIR"
 EOF
 
 a2enconf claude-sessions >/dev/null
-log "Validando config do Apache"
+log "Validating Apache config"
 if ! apache2ctl configtest 2>&1 | grep -q "Syntax OK"; then
-  echo "✗ Apache config falhou no configtest:" >&2
+  echo "✗ Apache configtest failed:" >&2
   apache2ctl configtest
   exit 1
 fi
 ok "Apache config OK"
 
-log "Recarregando Apache"
+log "Reloading Apache"
 systemctl reload apache2
 
 # ---------------------------------------------------------------------------
@@ -142,45 +151,45 @@ systemctl reload apache2
 # ---------------------------------------------------------------------------
 sleep 1
 if curl -fsS -o /dev/null "http://localhost$URL_PATH/"; then
-  ok "Front-end respondendo em http://localhost$URL_PATH/"
+  ok "Front-end responding at http://localhost$URL_PATH/"
 else
-  warn "Front-end não respondeu no smoke test (veja /var/log/apache2/error.log)"
+  warn "Front-end did not respond to smoke test (check /var/log/apache2/error.log)"
 fi
 if curl -fsS -o /dev/null "http://localhost$URL_PATH/api/sessions"; then
-  ok "API respondendo em http://localhost$URL_PATH/api/sessions"
+  ok "API responding at http://localhost$URL_PATH/api/sessions"
 else
-  warn "API não respondeu no smoke test (veja /var/log/apache2/error.log)"
+  warn "API did not respond to smoke test (check /var/log/apache2/error.log)"
 fi
 
 # ---------------------------------------------------------------------------
 # 7. CLI shortcut (opens the dashboard in the default browser)
 # ---------------------------------------------------------------------------
-log "Criando comando de terminal: claude-sessions"
+log "Creating terminal command: claude-sessions"
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"
 BIN_FILE="$BIN_DIR/claude-sessions"
 cat > "$BIN_FILE" <<EOF
 #!/usr/bin/env bash
-# Abre o Claude Sessions Manager no navegador padrão.
-# Gerado automaticamente pelo install.sh em $(date -Iseconds).
+# Opens Claude Sessions Manager in the default browser.
+# Auto-generated by install.sh on $(date -Iseconds).
 URL="http://localhost$URL_PATH/"
 if command -v xdg-open >/dev/null 2>&1; then
   xdg-open "\$URL" >/dev/null 2>&1 &
 elif command -v open >/dev/null 2>&1; then
   open "\$URL" &
 else
-  echo "Abra manualmente: \$URL"
+  echo "Open manually: \$URL"
 fi
 EOF
 chmod 0755 "$BIN_FILE"
 # Convenience alias with the full name
 ln -sf "$BIN_FILE" "$BIN_DIR/claude-sessions-manager"
-ok "Comando instalado em $BIN_FILE (alias: claude-sessions-manager)"
+ok "Command installed at $BIN_FILE (alias: claude-sessions-manager)"
 
 echo
 echo "────────────────────────────────────────────────────────────"
-ok  "Instalação concluída"
+ok  "Installation complete"
 echo
-echo "  🌐  Acesse:   http://localhost$URL_PATH/"
-echo "  💻  Terminal: \$ claude-sessions    (abre no navegador)"
-echo "  🗑  Remover: sudo ./uninstall.sh"
+echo "  🌐  Open:     http://localhost$URL_PATH/"
+echo "  💻  Terminal: \$ claude-sessions    (opens in browser)"
+echo "  🗑  Remove:  sudo ./uninstall.sh"
 echo "────────────────────────────────────────────────────────────"
