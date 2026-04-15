@@ -2,12 +2,69 @@
   'use strict';
   const API = 'api';
 
+  // ----- i18n (files in ./i18n/) -----
+  const I18N_BASE = 'i18n';
+  // Filled at boot from i18n/index.json
+  let I18N_AVAILABLE = [];    // [{code, name, short, flag}]
+  let I18N_DEFAULT = 'pt-br';
+  const I18N_CACHE = {};      // { code: { key: value } }
+
+  async function fetchJson(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status} loading ${url}`);
+    return res.json();
+  }
+
+  async function loadLangIndex() {
+    const idx = await fetchJson(`${I18N_BASE}/index.json`);
+    I18N_AVAILABLE = Array.isArray(idx.languages) ? idx.languages : [];
+    I18N_DEFAULT = idx.default && I18N_AVAILABLE.some(l => l.code === idx.default)
+      ? idx.default
+      : (I18N_AVAILABLE[0]?.code || 'pt-br');
+  }
+
+  async function loadLang(code) {
+    if (I18N_CACHE[code]) return I18N_CACHE[code];
+    const dict = await fetchJson(`${I18N_BASE}/${code}.json`);
+    I18N_CACHE[code] = dict;
+    return dict;
+  }
+
+  function supportedLang(code) {
+    return I18N_AVAILABLE.some(l => l.code === code);
+  }
+
+  function detectLang() {
+    try {
+      const saved = localStorage.getItem('cs:lang');
+      if (saved && supportedLang(saved)) return saved;
+    } catch (_) {}
+    const nav = (navigator.language || '').toLowerCase();
+    // Try exact match first (e.g., "pt-br"), then language prefix (e.g., "pt")
+    const exact = I18N_AVAILABLE.find(l => l.code.toLowerCase() === nav);
+    if (exact) return exact.code;
+    const prefix = nav.split('-')[0];
+    const prefixed = I18N_AVAILABLE.find(l => l.code.toLowerCase().startsWith(prefix));
+    if (prefixed) return prefixed.code;
+    return I18N_DEFAULT;
+  }
+
+  function t(key, vars) {
+    const dict = I18N_CACHE[state?.lang] || I18N_CACHE[I18N_DEFAULT] || {};
+    let s = dict[key];
+    if (s === undefined) s = (I18N_CACHE[I18N_DEFAULT] || {})[key];
+    if (s === undefined) return key;
+    if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => (k in vars ? String(vars[k]) : ''));
+    return s;
+  }
+
   const state = {
     sessions: [],
     filter: 'all',       // all | favorites | trash
     project: null,       // cwd of active project, null = all
     query: '',
     sort: localStorage.getItem('cs:sort') || 'recent',
+    lang: null,          // resolved after loading i18n/index.json
     editing: null,
     collapsed: new Set(loadCollapsed()),
   };
@@ -35,16 +92,16 @@
     if (!ts) return '';
     const d = new Date(ts * 1000);
     const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 60) return 'agora';
-    if (diff < 3600) return `${Math.round(diff / 60)} min`;
-    if (diff < 86400) return `${Math.round(diff / 3600)} h`;
-    if (diff < 86400 * 7) return `${Math.round(diff / 86400)} d`;
-    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+    if (diff < 60) return t('date.now');
+    if (diff < 3600) return `${Math.round(diff / 60)} ${t('date.min')}`;
+    if (diff < 86400) return `${Math.round(diff / 3600)} ${t('date.h')}`;
+    if (diff < 86400 * 7) return `${Math.round(diff / 86400)} ${t('date.d')}`;
+    return d.toLocaleDateString(t('locale'), { day: '2-digit', month: 'short' });
   }
 
   function fullDate(ts) {
     if (!ts) return '';
-    return new Date(ts * 1000).toLocaleString('pt-BR');
+    return new Date(ts * 1000).toLocaleString(t('locale'));
   }
 
   function prettySize(bytes) {
@@ -75,10 +132,10 @@
     return raw.replace(/^\/home\/[^/]+/, '~');
   }
 
-  function projectKey(s) { return s.cwd || s.project_folder || '(desconhecido)'; }
+  function projectKey(s) { return s.cwd || s.project_folder || t('unknown.project'); }
 
   function projectShortName(cwd) {
-    if (!cwd) return '(desconhecido)';
+    if (!cwd) return t('unknown.project');
     const parts = cwd.split('/').filter(Boolean);
     return parts[parts.length - 1] || cwd;
   }
@@ -284,7 +341,7 @@
       case 'size-desc':     arr.sort(byNum(s => s.size)); break;
       case 'name': {
         const label = s => (s.name || s.first_message || s.id).toLowerCase();
-        arr.sort((a, b) => label(a).localeCompare(label(b), 'pt-BR'));
+        arr.sort((a, b) => label(a).localeCompare(label(b), t('locale')));
         break;
       }
       case 'recent':
@@ -330,7 +387,7 @@
     const projects = projectsGrouped();
     const list = $('#project-list');
     if (projects.length === 0) {
-      list.innerHTML = `<div class="hint" style="padding:6px 10px">Nenhum projeto</div>`;
+      list.innerHTML = `<div class="hint" style="padding:6px 10px">${escapeHtml(t('nav.empty'))}</div>`;
       return;
     }
     list.innerHTML = projects.map(p => {
@@ -348,29 +405,32 @@
 
   // ----- Render: main -----
   function renderCrumbs(listLen) {
-    const viewLabel = state.filter === 'favorites' ? 'Favoritas' :
-                      state.filter === 'trash' ? 'Lixeira' : 'Todas as sessões';
+    const viewLabel = state.filter === 'favorites' ? t('crumbs.view.favorites') :
+                      state.filter === 'trash' ? t('crumbs.view.trash') : t('crumbs.view.all');
     $('#crumb-view').textContent = viewLabel;
-    const scope = state.project ? projectShortName(state.project) : 'Todos os projetos';
+    const scope = state.project ? projectShortName(state.project) : t('crumbs.scope.all');
     $('#crumb-scope').textContent = scope;
     const total = state.sessions.length;
-    $('#result-count').textContent = `${listLen} de ${total} ${total === 1 ? 'sessão' : 'sessões'}${state.query ? ` · filtro "${state.query}"` : ''}`;
+    const word = total === 1 ? t('crumbs.count.singular') : t('crumbs.count.plural');
+    const of = t('crumbs.count.of');
+    const filterPart = state.query ? ` · ${t('crumbs.count.filter')} "${state.query}"` : '';
+    $('#result-count').textContent = `${listLen} ${of} ${total} ${word}${filterPart}`;
   }
 
   function renderEmpty() {
     const map = {
-      search: { icon: 'search', h: 'Nada encontrado', p: 'Tente outro termo ou limpe a busca.' },
-      favorites: { icon: 'star', h: 'Nenhuma favorita', p: 'Clique na estrela de uma sessão para marcá-la como favorita.' },
-      trash: { icon: 'trash', h: 'Lixeira vazia', p: 'Sessões movidas para a lixeira aparecem aqui. Nada é apagado do disco até você confirmar.' },
-      none: { icon: 'inbox', h: 'Sem sessões', p: 'Nenhuma sessão do Claude Code foi encontrada em ~/.claude/projects.' },
+      search: { icon: 'search', h: t('empty.search.title'), p: t('empty.search.msg') },
+      favorites: { icon: 'star', h: t('empty.favorites.title'), p: t('empty.favorites.msg') },
+      trash: { icon: 'trash', h: t('empty.trash.title'), p: t('empty.trash.msg') },
+      none: { icon: 'inbox', h: t('empty.none.title'), p: t('empty.none.msg') },
     };
     const state_ = state.query ? 'search' : state.filter === 'favorites' ? 'favorites' : state.filter === 'trash' ? 'trash' : 'none';
     const d = map[state_];
     return `
       <div class="empty">
         <div class="illus">${icon(d.icon)}</div>
-        <h3>${d.h}</h3>
-        <p>${d.p}</p>
+        <h3>${escapeHtml(d.h)}</h3>
+        <p>${escapeHtml(d.p)}</p>
       </div>
     `;
   }
@@ -384,7 +444,7 @@
 
     const titleHtml = displayName
       ? `<div class="card-title">${escapeHtml(displayName)}</div>`
-      : `<div class="card-title unnamed">${escapeHtml(truncate(preview, 140) || '(sem título)')}</div>`;
+      : `<div class="card-title unnamed">${escapeHtml(truncate(preview, 140) || t('card.untitled'))}</div>`;
 
     const descHtml = s.description
       ? `<div class="card-desc">${escapeHtml(s.description)}</div>`
@@ -393,21 +453,22 @@
         : '');
 
     const meta = [];
-    if (s.git_branch) meta.push(`<span class="meta-pill branch" data-tooltip="Branch atual">${icon('branch')}${escapeHtml(truncate(s.git_branch, 28))}</span>`);
-    if (s.context_tokens) meta.push(`<span class="meta-pill tokens ${tokenClass(s.context_tokens)}" data-tooltip="Contexto ao fim da sessão: ${s.context_tokens.toLocaleString('pt-BR')} tokens">${icon('database')}${prettyTokens(s.context_tokens)}</span>`);
-    if (s.size) meta.push(`<span class="meta-pill" data-tooltip="Tamanho da sessão em disco">${icon('file')}${prettySize(s.size)}</span>`);
-    meta.push(`<span class="meta-pill" data-tooltip="${fullDate(s.mtime)}">${icon('clock')}${prettyDate(s.mtime)}</span>`);
+    if (s.git_branch) meta.push(`<span class="meta-pill branch" data-tooltip="${escapeHtml(t('card.tooltip.branch'))}">${icon('branch')}${escapeHtml(truncate(s.git_branch, 28))}</span>`);
+    if (s.context_tokens) meta.push(`<span class="meta-pill tokens ${tokenClass(s.context_tokens)}" data-tooltip="${escapeHtml(t('card.tooltip.tokens', { n: s.context_tokens.toLocaleString(t('locale')) }))}">${icon('database')}${prettyTokens(s.context_tokens)}</span>`);
+    if (s.size) meta.push(`<span class="meta-pill" data-tooltip="${escapeHtml(t('card.tooltip.size'))}">${icon('file')}${prettySize(s.size)}</span>`);
+    meta.push(`<span class="meta-pill" data-tooltip="${escapeHtml(fullDate(s.mtime))}">${icon('clock')}${prettyDate(s.mtime)}</span>`);
 
+    const favLabel = s.favorite ? t('card.action.unfavorite') : t('card.action.favorite');
     const actions = s.deleted
       ? `
-        <button class="card-action success" data-action="restore" data-tooltip="Restaurar" aria-label="Restaurar">${icon('rotate')}</button>
-        <button class="card-action danger" data-action="purge" data-tooltip="Excluir permanentemente" aria-label="Excluir permanentemente">${icon('x')}</button>
+        <button class="card-action success" data-action="restore" data-tooltip="${escapeHtml(t('card.action.restore'))}" aria-label="${escapeHtml(t('card.action.restore'))}">${icon('rotate')}</button>
+        <button class="card-action danger" data-action="purge" data-tooltip="${escapeHtml(t('card.action.purge'))}" aria-label="${escapeHtml(t('card.action.purge'))}">${icon('x')}</button>
       `
       : `
-        <button class="card-action primary" data-action="copy" data-tooltip="Copia claude --resume ${s.id}">${icon('copy')}Copiar comando</button>
-        <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" data-tooltip="${s.favorite ? 'Desfavoritar' : 'Favoritar'}" aria-label="${s.favorite ? 'Desfavoritar' : 'Favoritar'}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
-        <button class="card-action" data-action="edit" data-tooltip="Editar nome e descrição" aria-label="Editar">${icon('edit')}</button>
-        <button class="card-action danger" data-action="delete" data-tooltip="Mover para lixeira" aria-label="Mover para lixeira">${icon('trash')}</button>
+        <button class="card-action primary" data-action="copy" data-tooltip="${escapeHtml(t('card.action.copy', { id: s.id }))}">${icon('copy')}${escapeHtml(t('card.action.copyLabel'))}</button>
+        <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" data-tooltip="${escapeHtml(favLabel)}" aria-label="${escapeHtml(favLabel)}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
+        <button class="card-action" data-action="edit" data-tooltip="${escapeHtml(t('card.action.edit'))}" aria-label="${escapeHtml(t('card.action.editAria'))}">${icon('edit')}</button>
+        <button class="card-action danger" data-action="delete" data-tooltip="${escapeHtml(t('card.action.delete'))}" aria-label="${escapeHtml(t('card.action.delete'))}">${icon('trash')}</button>
       `;
 
     return `
@@ -478,13 +539,13 @@
       const cmd = `claude --resume ${s.id}`;
       const ok = await copyToClipboard(cmd);
       if (ok) {
-        toast(`Copiado: <span class="cmd">${escapeHtml(cmd)}</span>`, 'success');
+        toast(t('toast.copied', { cmd: escapeHtml(cmd) }), 'success');
         if (cardEl) {
           cardEl.classList.add('copied');
           setTimeout(() => cardEl.classList.remove('copied'), 1200);
         }
       } else {
-        toast('Falha ao copiar', 'error');
+        toast(t('toast.copyFailed'), 'error');
       }
       return;
     }
@@ -498,30 +559,30 @@
     if (action === 'edit') { openEditor(s); return; }
     if (action === 'delete') {
       const ok = await confirmDialog({
-        title: 'Mover para a lixeira?',
-        message: 'Você pode restaurar quando quiser pela aba Lixeira. Nada é apagado do disco.',
-        confirmLabel: 'Mover para lixeira',
+        title: t('confirm.delete.title'),
+        message: t('confirm.delete.msg'),
+        confirmLabel: t('confirm.delete.btn'),
         variant: 'warning',
       });
       if (!ok) return;
       await patchSession(s.id, { deleted: true });
       s.deleted = true;
       render();
-      toast('Movido para a lixeira', 'success');
+      toast(t('toast.trashed'), 'success');
       return;
     }
     if (action === 'restore') {
       await patchSession(s.id, { deleted: false });
       s.deleted = false;
       render();
-      toast('Restaurado', 'success');
+      toast(t('toast.restored'), 'success');
       return;
     }
     if (action === 'purge') {
       const ok = await confirmDialog({
-        title: 'Excluir permanentemente?',
-        message: `A sessão ${s.id.slice(0,8)} vai ser apagada do disco. Essa ação não pode ser desfeita.`,
-        confirmLabel: 'Excluir definitivamente',
+        title: t('confirm.purge.title'),
+        message: t('confirm.purge.msg', { short: s.id.slice(0, 8) }),
+        confirmLabel: t('confirm.purge.btn'),
         variant: 'danger',
       });
       if (!ok) return;
@@ -529,9 +590,9 @@
         await deleteSession(s.id);
         state.sessions = state.sessions.filter(x => x.id !== s.id);
         render();
-        toast('Excluído permanentemente', 'success');
+        toast(t('toast.purged'), 'success');
       } catch (e) {
-        toast(`Erro: ${escapeHtml(e.message)}`, 'error');
+        toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
       }
       return;
     }
@@ -564,9 +625,9 @@
       if (s) { s.name = name; s.description = description; }
       closeEditor();
       render();
-      toast('Salvo', 'success');
+      toast(t('toast.saved'), 'success');
     } catch (e) {
-      toast(`Erro: ${escapeHtml(e.message)}`, 'error');
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
     }
   }
 
@@ -579,8 +640,8 @@
       $('#content').innerHTML = `
         <div class="empty">
           <div class="illus">${icon('alert')}</div>
-          <h3>Falha ao carregar sessões</h3>
-          <p>${escapeHtml(e.message)} — verifique se <code>/claude-sessions/api</code> está acessível.</p>
+          <h3>${escapeHtml(t('error.load.title'))}</h3>
+          <p>${t('error.load.msg', { err: escapeHtml(e.message) })}</p>
         </div>
       `;
     }
@@ -644,7 +705,7 @@
     try {
       await handleAction(action, s, card);
     } catch (e) {
-      toast(`Erro: ${escapeHtml(e.message)}`, 'error');
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
     }
   });
 
@@ -703,5 +764,95 @@
 
   $('#edit-save').addEventListener('click', saveEditor);
 
-  load();
+  // ----- i18n application -----
+  function applyI18n(root = document) {
+    root.querySelectorAll('[data-i18n]').forEach(el => {
+      el.textContent = t(el.dataset.i18n);
+    });
+    root.querySelectorAll('[data-i18n-html]').forEach(el => {
+      el.innerHTML = t(el.dataset.i18nHtml);
+    });
+    root.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      el.setAttribute('placeholder', t(el.dataset.i18nPlaceholder));
+    });
+    root.querySelectorAll('[data-i18n-aria]').forEach(el => {
+      el.setAttribute('aria-label', t(el.dataset.i18nAria));
+    });
+    root.querySelectorAll('[data-i18n-tooltip]').forEach(el => {
+      el.setAttribute('data-tooltip', t(el.dataset.i18nTooltip));
+    });
+  }
+
+  async function setLang(lang) {
+    if (!supportedLang(lang) || lang === state.lang) return;
+    try { await loadLang(lang); } catch (e) { console.error(e); return; }
+    state.lang = lang;
+    try { localStorage.setItem('cs:lang', lang); } catch (_) {}
+    document.documentElement.setAttribute('lang', lang);
+    document.documentElement.setAttribute('data-lang', lang);
+    applyI18n();
+    syncLangButtons();
+    render();
+    document.dispatchEvent(new CustomEvent('cs:lang-changed', { detail: { lang } }));
+  }
+
+  function renderLangSwitch() {
+    const host = $('.lang-switch');
+    if (!host) return;
+    host.setAttribute('aria-label', t('lang.label'));
+    const options = I18N_AVAILABLE.map(l => {
+      const flag = l.flag ? `${l.flag} ` : '';
+      const label = `${flag}${l.name}`;
+      return `<option value="${escapeHtml(l.code)}">${escapeHtml(label)}</option>`;
+    }).join('');
+    host.innerHTML = `
+      <select class="lang-select" id="lang-select" aria-label="${escapeHtml(t('lang.label'))}">
+        ${options}
+      </select>
+      <svg class="icon lang-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+    `;
+    const sel = $('#lang-select', host);
+    sel.addEventListener('change', (e) => setLang(e.target.value));
+  }
+
+  function syncLangButtons() {
+    const sel = $('#lang-select');
+    if (sel && sel.value !== state.lang) sel.value = state.lang;
+  }
+
+  // Expose for external callers
+  window.CSI18N = {
+    t, setLang, applyI18n,
+    getLang: () => state.lang,
+    getAvailable: () => [...I18N_AVAILABLE],
+  };
+
+  // ----- Boot -----
+  async function boot() {
+    try {
+      await loadLangIndex();
+    } catch (e) {
+      console.error('i18n index failed to load', e);
+      I18N_AVAILABLE = [{ code: 'pt-br', name: 'Português', short: 'PT', flag: '🇧🇷' }];
+      I18N_DEFAULT = 'pt-br';
+    }
+    state.lang = detectLang();
+    try {
+      await loadLang(state.lang);
+    } catch (e) {
+      console.error(`i18n dict for ${state.lang} failed, falling back to ${I18N_DEFAULT}`, e);
+      if (state.lang !== I18N_DEFAULT) {
+        state.lang = I18N_DEFAULT;
+        try { await loadLang(I18N_DEFAULT); } catch (_) {}
+      }
+    }
+    document.documentElement.setAttribute('lang', state.lang);
+    document.documentElement.setAttribute('data-lang', state.lang);
+    renderLangSwitch();
+    applyI18n();
+    syncLangButtons();
+    load();
+  }
+
+  boot();
 })();

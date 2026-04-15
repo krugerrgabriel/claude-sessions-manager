@@ -1,0 +1,12 @@
+{
+  "default": "pt-br",
+  "languages": [
+    { "code": "pt-br", "name": "Português", "short": "PT", "flag": "🇧🇷" },
+    { "code": "en",    "name": "English",    "short": "EN", "flag": "🇺🇸" },
+    { "code": "es",    "name": "Español",    "short": "ES", "flag": "🇪🇸" },
+    { "code": "ja",    "name": "日本語",      "short": "JA", "flag": "🇯🇵" },
+    { "code": "zh-CN", "name": "简体中文",    "short": "中", "flag": "🇨🇳" },
+    { "code": "ko",    "name": "한국어",      "short": "KO", "flag": "🇰🇷" },
+    { "code": "de",    "name": "Deutsch",    "short": "DE", "flag": "🇩🇪" }
+  ]
+}

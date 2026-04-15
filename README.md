@@ -1,8 +1,18 @@
 <h1 align="center">🔖 Claude Sessions Manager</h1>
 
 <p align="center">
-  <strong>Seu ponto de partida diário para o <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
-  Retome qualquer conversa de onde parou — sem re-explicar o projeto, sem perder contexto.
+  <strong>Your daily starting point for <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
+  Pick up any conversation right where you left off — no re-explaining the project, no lost context.
+</p>
+
+<p align="center">
+  <strong>🇺🇸 English</strong> ·
+  <a href="README.pt-BR.md">🇧🇷 Português</a> ·
+  <a href="README.es.md">🇪🇸 Español</a> ·
+  <a href="README.ja.md">🇯🇵 日本語</a> ·
+  <a href="README.zh-CN.md">🇨🇳 简体中文</a> ·
+  <a href="README.ko.md">🇰🇷 한국어</a> ·
+  <a href="README.de.md">🇩🇪 Deutsch</a>
 </p>
 
 <p align="center">
@@ -15,204 +25,205 @@
 
 ---
 
-## 💡 Por que usar
+## 💡 Why use it
 
-Todo projeto tem um custo oculto: **reaquecer o contexto**. Toda vez que você abre o Claude, perde tempo:
+Every project has a hidden cost: **reheating context**. Every time you open Claude, you lose time:
 
-- 🔁 Re-explicando a arquitetura
-- 📍 Apontando onde parou
-- 📂 Indicando os arquivos importantes
-- 🧠 Realinhando o que estava em andamento
+- 🔁 Re-explaining the architecture
+- 📍 Pointing out where you stopped
+- 📂 Listing the important files
+- 🧠 Realigning what was in progress
 
-São **15–30 minutos só pra começar a produzir**. E quando o terminal fecha, o contexto que o Claude acabou de montar vai embora.
+That's **15–30 minutes just to start being productive**. And when the terminal closes, the context Claude just built is gone.
 
-✨ **A boa notícia:** o Claude Code já salva cada conversa pra você retomar.  
-😩 **O problema:** achar a conversa certa no meio de dezenas de códigos automáticos.
+✨ **Good news:** Claude Code already saves every conversation for you to resume.
 
-É isso que este projeto resolve. Em 4 passos:
+😩 **The problem:** finding the right conversation among dozens of auto-generated codes.
 
-1. 🏁 Abre a dashboard
-2. 🎯 Acha a conversa certa
-3. 📋 Clica — o comando já está no clipboard
-4. 💻 Cola no terminal e continua de onde parou
+That's what this project solves. In 4 steps:
 
-> **Retomar custa segundos. Recomeçar custa horas.**
+1. 🏁 Open the dashboard
+2. 🎯 Find the right conversation
+3. 📋 Click — the command is already in your clipboard
+4. 💻 Paste in the terminal and pick up where you left off
+
+> **Resuming costs seconds. Starting over costs hours.**
 
 ---
 
-## ✨ Funcionalidades
+## ✨ Features
 
 | | |
 |---|---|
-| 🔁 **Retomar com 1 clique** | Clique numa conversa → o comando de retomar fica no clipboard na hora |
-| 🏷️ **Nomes e anotações** | Dê um nome humano pra cada conversa e anote em que ponto você parou |
-| ⭐ **Favoritos** | Destaque as conversas que você usa todo dia |
-| 🗑️ **Lixeira segura** | Arquive antigas sem medo — exclusão definitiva só com confirmação dupla |
-| 🔍 **Busca instantânea** | Filtra por nome, anotação, projeto, branch ou pelo que foi dito na conversa |
-| 📁 **Agrupamento por projeto** | Conversas organizadas pelo projeto em que estavam, com contador na lateral |
-| 📊 **Informações úteis** | Quanto contexto consumiu, tamanho, branch, última atividade — tudo visível no card |
-| 🌡️ **Aviso de saturação** | Conversas perto de estourar o contexto aparecem destacadas em amarelo e vermelho |
-| ⌨️ **Atalhos de teclado** | `/` busca, `Esc` fecha, `Enter` retoma — sem tirar a mão do teclado |
-| 🌗 **Tema escuro suave** | Visual pensado pra horas de tela, com acento terracotta inspirado na Claude |
-| ♿ **Acessível** | Navegação por teclado, contraste adequado, respeita "reduzir movimento" do sistema |
+| 🔁 **One-click resume** | Click a conversation → the resume command is copied to your clipboard instantly |
+| 🏷️ **Names and notes** | Give each conversation a human-readable name and jot down where you stopped |
+| ⭐ **Favorites** | Highlight the conversations you use every day |
+| 🗑️ **Safe trash bin** | Archive old ones without fear — permanent deletion requires double confirmation |
+| 🔍 **Instant search** | Filter by name, notes, project, branch, or by what was said in the conversation |
+| 📁 **Grouped by project** | Conversations organized by the project they belong to, with a sidebar counter |
+| 📊 **Useful info** | Context consumed, size, branch, last activity — all visible on the card |
+| 🌡️ **Saturation warning** | Conversations close to filling the context window are highlighted in yellow and red |
+| ⌨️ **Keyboard shortcuts** | `/` search, `Esc` close, `Enter` resume — without lifting your hands off the keyboard |
+| 🌗 **Soft dark theme** | Visual designed for hours on screen, with a terracotta accent inspired by Claude |
+| ♿ **Accessible** | Keyboard navigation, proper contrast, honors the system's "reduce motion" setting |
 
 ---
 
-## 📦 Instalação
+## 📦 Installation
 
-### 1️⃣ Clone o repositório
+### 1️⃣ Clone the repository
 
 ```bash
 git clone https://github.com/krugerrgabriel/claude-sessions-manager.git
 cd claude-sessions-manager
 ```
 
-### 2️⃣ Rode o instalador
+### 2️⃣ Run the installer
 
 ```bash
 sudo ./install.sh
 ```
 
-O instalador cuida de tudo sozinho — instala o que falta, copia os arquivos, ajusta as permissões e configura o servidor web. Termina em segundos.
+The installer takes care of everything — it installs what's missing, copies the files, adjusts permissions, and configures the web server. Finishes in seconds.
 
-### 3️⃣ Abra no navegador
+### 3️⃣ Open it in your browser
 
-Duas formas, escolha a que preferir:
+Two ways, pick whichever you prefer:
 
-🖥️ **Direto no endereço:** http://localhost/claude-sessions/
+🖥️ **Directly via URL:** http://localhost/claude-sessions/
 
-⌨️ **Ou pelo terminal:**
+⌨️ **Or from the terminal:**
 
 ```bash
 claude-sessions
 ```
 
-ou
+or
 
 ```bash
 claude-sessions-manager
 ```
 
-O instalador cria esse comando automaticamente — ele abre o dashboard no seu navegador padrão.
+The installer creates that command automatically — it opens the dashboard in your default browser.
 
-Pronto. 🎉
+Done. 🎉
 
-> 💡 **Pré-requisito único:** qualquer Linux com `apt` (Ubuntu, Debian, Mint, Pop!_OS, etc.) e `sudo`.
+> 💡 **Single prerequisite:** any Linux with `apt` (Ubuntu, Debian, Mint, Pop!_OS, etc.) and `sudo`.
 
 ---
 
-## ⚙️ Configurações avançadas
+## ⚙️ Advanced configuration
 
-Use só se precisar — tudo funciona de fábrica.
+Only use these if you need to — everything works out of the box.
 
 <details>
-<summary><strong>Instalar em outro caminho ou URL</strong></summary>
+<summary><strong>Install in a different path or URL</strong></summary>
 
 ```bash
 sudo INSTALL_DIR=/opt/claude-sessions-manager URL_PATH=/dashboard ./install.sh
 ```
-Depois acesse em **http://localhost/dashboard/**.
+Then open **http://localhost/dashboard/**.
 </details>
 
 <details>
-<summary><strong>Usar outra pasta de sessões</strong></summary>
+<summary><strong>Use a different sessions folder</strong></summary>
 
 ```bash
-sudo PROJECTS_DIR=/caminho/alternativo/.claude/projects ./install.sh
+sudo PROJECTS_DIR=/alternative/path/.claude/projects ./install.sh
 ```
 </details>
 
 <details>
-<summary><strong>Desinstalar</strong></summary>
+<summary><strong>Uninstall</strong></summary>
 
 ```bash
-sudo ./uninstall.sh           # preserva suas anotações (nomes, favoritos, descrições)
-sudo ./uninstall.sh --purge   # remove tudo, inclusive as anotações
+sudo ./uninstall.sh           # keeps your notes (names, favorites, descriptions)
+sudo ./uninstall.sh --purge   # removes everything, including your notes
 ```
 </details>
 
 ---
 
-## ⌨️ Atalhos
+## ⌨️ Shortcuts
 
-| Tecla | Ação |
+| Key | Action |
 |---|---|
-| `/` | Focar a busca |
-| `Esc` | Fechar modal, limpar busca ou fechar menu mobile |
-| `Enter` / `Space` | Retomar a conversa em foco |
-| `Ctrl+Enter` | Salvar edição (no modal) |
+| `/` | Focus the search input |
+| `Esc` | Close modal, clear search, or close mobile menu |
+| `Enter` / `Space` | Resume the focused conversation |
+| `Ctrl+Enter` | Save edits (inside the modal) |
 
 ---
 
-## 🏗️ Como funciona por dentro
+## 🏗️ How it works under the hood
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Browser (você)                           │
+│                        Browser (you)                            │
 └───────────────┬─────────────────────────────────┬───────────────┘
                 │ HTML/CSS/JS                      │ fetch /api/*
                 ▼                                  ▼
 ┌────────────────────────┐          ┌────────────────────────────┐
-│   Apache2 (estático)   │          │  mod_wsgi → app.wsgi (py)  │
+│   Apache2 (static)     │          │  mod_wsgi → app.wsgi (py)  │
 └────────────────────────┘          └──────────────┬─────────────┘
-                                                   │ lê/escreve
+                                                   │ read/write
                                                    ▼
             ┌─────────────────────────────────────────────────────┐
-            │  ~/.claude/projects/*/*.jsonl    (suas sessões)     │
-            │  data/metadata.json              (suas anotações)    │
-            │  cache/sessions.json             (cache interno)     │
+            │  ~/.claude/projects/*/*.jsonl    (your sessions)    │
+            │  data/metadata.json              (your notes)        │
+            │  cache/sessions.json             (internal cache)    │
             └─────────────────────────────────────────────────────┘
 ```
 
 ### Stack
 
-| Camada | Tech | Por que |
+| Layer | Tech | Why |
 |---|---|---|
-| **Frontend** | HTML + CSS + vanilla JS | Zero build step, carrega em <100ms |
-| **Backend** | Python 3 (stdlib) | Sem `pip install`, sem `venv` |
-| **Integração** | mod_wsgi | Já vem no Apache moderno; roda como o seu usuário |
-| **Persistência** | JSON local | Suas anotações num arquivo editável à mão |
-| **Fontes** | Inter + JetBrains Mono | Boa legibilidade em telas densas |
+| **Frontend** | HTML + CSS + vanilla JS | Zero build step, loads in <100ms |
+| **Backend** | Python 3 (stdlib) | No `pip install`, no `venv` |
+| **Integration** | mod_wsgi | Ships with modern Apache; runs as your user |
+| **Persistence** | Local JSON | Your notes in a file you can hand-edit |
+| **Fonts** | Inter + JetBrains Mono | Great readability on dense screens |
 
-### Estrutura do repositório
+### Repository layout
 
 ```
 claude-sessions-manager/
-├── index.html       ← UI e ícones SVG
-├── style.css        ← design system (tema escuro)
-├── app.js           ← lógica de render e API
-├── app.wsgi         ← backend Python
-├── install.sh       ← instalador
-├── uninstall.sh     ← desinstalador
-├── README.md        ← você está aqui
-├── .gitignore       ← ignora dados gerados
-├── data/            ← (gerado) suas anotações
-└── cache/           ← (gerado) cache interno
+├── index.html       ← UI and SVG icons
+├── style.css        ← design system (dark theme)
+├── app.js           ← rendering and API logic
+├── app.wsgi         ← Python backend
+├── install.sh       ← installer
+├── uninstall.sh     ← uninstaller
+├── README.md        ← you are here
+├── .gitignore       ← ignores generated data
+├── data/            ← (generated) your notes
+└── cache/           ← (generated) internal cache
 ```
 
 ---
 
-## 🔒 Segurança
+## 🔒 Security
 
-- O backend roda **como você**, não como `www-data` — lê suas sessões sem `chmod` global.
-- A API só aceita IDs em formato UUID (sem path traversal).
-- Exclusão permanente exige confirmação dupla no frontend.
-- Serve só em **http://localhost** por padrão — **não exponha pra internet** sem autenticação.
+- The backend runs **as you**, not as `www-data` — it reads your sessions without a global `chmod`.
+- The API only accepts IDs in UUID format (no path traversal).
+- Permanent deletion requires double confirmation in the frontend.
+- Serves only on **http://localhost** by default — **do not expose it to the internet** without authentication.
 
 ---
 
-## 🛠️ Desenvolvendo
+## 🛠️ Developing
 
-Sem build step. Edite e recarregue a página.
+No build step. Edit and refresh the page.
 
 ```bash
-# Forçar mod_wsgi a recarregar após mudar o backend
+# Force mod_wsgi to reload after changing the backend
 sudo touch /var/www/html/claude-sessions/app.wsgi
 
-# Ver logs
+# Tail the logs
 sudo tail -f /var/log/apache2/error.log
 
-# Limpar cache interno (após mudar parsing)
+# Clear the internal cache (after changing parsing logic)
 rm -f /var/www/html/claude-sessions/cache/sessions.json
 ```
 
@@ -221,61 +232,61 @@ rm -f /var/www/html/claude-sessions/cache/sessions.json
 ## 🐛 Troubleshooting
 
 <details>
-<summary><strong>"Falha ao carregar sessões"</strong></summary>
+<summary><strong>"Failed to load sessions"</strong></summary>
 
 ```bash
 sudo tail -20 /var/log/apache2/error.log
 ```
 
-Causas comuns:
-- `~/.claude/projects/` ainda não existe — use o Claude Code pelo menos uma vez
-- `mod_wsgi` não habilitado: `sudo a2enmod wsgi && sudo systemctl reload apache2`
+Common causes:
+- `~/.claude/projects/` doesn't exist yet — run Claude Code at least once
+- `mod_wsgi` isn't enabled: `sudo a2enmod wsgi && sudo systemctl reload apache2`
 </details>
 
 <details>
-<summary><strong>"Permission denied" ao excluir permanentemente</strong></summary>
+<summary><strong>"Permission denied" on permanent delete</strong></summary>
 
-O backend precisa rodar como o dono dos arquivos. Confira:
+The backend needs to run as the file owner. Check:
 ```bash
 grep WSGIDaemonProcess /etc/apache2/conf-available/claude-sessions.conf
 ```
-A linha deve ter `user=SEU_USUARIO`.
+The line must include `user=YOUR_USERNAME`.
 </details>
 
 <details>
-<summary><strong>Algumas sessões não aparecem</strong></summary>
+<summary><strong>Some sessions don't show up</strong></summary>
 
-Só sessões principais (retomáveis) são listadas. Conversas internas de sub-agentes são ignoradas de propósito.
+Only main (resumable) sessions are listed. Internal sub-agent conversations are intentionally ignored.
 </details>
 
 <details>
-<summary><strong>Mudei o backend mas a UI não atualiza</strong></summary>
+<summary><strong>Changed the backend but the UI doesn't update</strong></summary>
 
 ```bash
 sudo touch /var/www/html/claude-sessions/app.wsgi
 sudo systemctl reload apache2
 ```
-No browser: **Ctrl+Shift+R** pra limpar cache do navegador.
+In the browser: **Ctrl+Shift+R** to bust the browser cache.
 </details>
 
 ---
 
-## 🤝 Contribuindo
+## 🤝 Contributing
 
-PRs bem-vindos. Antes de mandar:
+PRs welcome. Before submitting:
 
-- Mantenha **zero dependências** (sem `pip`, sem `npm`)
-- Siga o design system em `style.css` (variáveis CSS semânticas)
-- Novos ícones: adicione `<symbol>` no sprite SVG do `index.html` (estilo Lucide, stroke 2, 24×24)
+- Keep **zero dependencies** (no `pip`, no `npm`)
+- Follow the design system in `style.css` (semantic CSS variables)
+- New icons: add a `<symbol>` to the SVG sprite in `index.html` (Lucide-style, stroke 2, 24×24)
 
 ---
 
-## 📜 Licença
+## 📜 License
 
-MIT — faça o que quiser.
+MIT — do whatever you want.
 
 ---
 
 <p align="center">
-  Feito com <code>vim</code> e café.
+  Made with <code>vim</code> and coffee.
 </p>
