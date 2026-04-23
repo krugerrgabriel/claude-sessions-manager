@@ -39,6 +39,7 @@
       <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></symbol>
       <symbol id="i-sort" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></symbol>
       <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></symbol>
+      <symbol id="i-move" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2"></path><path d="M2 13h10"></path><path d="m9 16 3-3-3-3"></path></symbol>
     </defs>
   </svg>
 
@@ -147,6 +148,32 @@
           </div>
           <div class="result-count" id="result-count"></div>
         </div>
+        <div class="bulk-bar" role="toolbar" aria-label="Bulk actions">
+          <span class="bulk-count"><span id="bulk-n">0</span> <span id="bulk-noun" data-i18n="bulk.count.plural">selecionadas</span></span>
+          <div class="bulk-actions">
+            <button id="bulk-fav" class="btn bulk-action bulk-action-warning" type="button">
+              <svg class="icon"><use href="#i-star"></use></svg>
+              <span id="bulk-fav-label" data-i18n="bulk.favorite">Favoritar</span>
+            </button>
+            <button id="bulk-move" class="btn bulk-action bulk-action-accent" type="button">
+              <svg class="icon"><use href="#i-move"></use></svg>
+              <span data-i18n="bulk.move">Mover para…</span>
+            </button>
+            <button id="bulk-trash" class="btn bulk-action bulk-action-danger" type="button">
+              <svg class="icon"><use href="#i-trash"></use></svg>
+              <span data-i18n="bulk.trash">Mover para lixeira</span>
+            </button>
+            <button id="bulk-restore" class="btn bulk-action bulk-action-success" type="button" hidden>
+              <svg class="icon"><use href="#i-rotate"></use></svg>
+              <span data-i18n="bulk.restore">Restaurar</span>
+            </button>
+            <button id="bulk-purge" class="btn bulk-action bulk-action-danger" type="button" hidden>
+              <svg class="icon"><use href="#i-x"></use></svg>
+              <span data-i18n="bulk.purge">Excluir permanentemente</span>
+            </button>
+          </div>
+          <button id="bulk-clear" class="btn bulk-action" type="button" data-i18n="bulk.clear">Limpar seleção</button>
+        </div>
       </div>
 
       <section class="content" id="content">
@@ -210,6 +237,32 @@
       <div class="modal-actions">
         <button class="btn ghost" data-confirm-cancel data-i18n="btn.cancel" type="button">Cancelar</button>
         <button id="confirm-ok" class="btn primary" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Move modal -->
+  <div id="move-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-move-close></div>
+    <div class="modal-card move-card" role="dialog" aria-modal="true" aria-labelledby="move-title">
+      <div class="modal-head">
+        <h2 id="move-title" data-i18n="move.title">Mover sessão</h2>
+        <button class="icon-btn" data-move-close data-i18n-aria="modal.close" aria-label="Fechar" type="button">
+          <svg class="icon"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <p id="move-intro" class="move-intro"></p>
+      <div class="search-wrap move-search">
+        <svg class="icon search-icon"><use href="#i-search"></use></svg>
+        <input id="move-search" type="search" data-i18n-placeholder="move.search" placeholder="Buscar projeto…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="move-list" class="move-list" role="listbox" aria-labelledby="move-title"></div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-move-close data-i18n="btn.cancel" type="button">Cancelar</button>
+        <button id="move-confirm" class="btn primary" type="button" disabled>
+          <svg class="icon"><use href="#i-move"></use></svg>
+          <span data-i18n="move.btn">Mover</span>
+        </button>
       </div>
     </div>
   </div>

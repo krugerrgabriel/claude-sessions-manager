@@ -293,6 +293,83 @@ def read_body(environ):
         return {}
 
 
+def cwd_to_folder(cwd):
+    """Encode an absolute cwd path to the Claude project folder name.
+    Mirrors how Claude Code names directories under ~/.claude/projects/.
+    Example: '/home/u/proj' → '-home-u-proj'."""
+    return '-' + cwd.lstrip('/').replace('/', '-')
+
+
+def move_session(sid, target_cwd):
+    """Move a session file to the project folder for target_cwd, rewriting
+    the `cwd` field on every line. gitBranch is left untouched.
+    Returns (status_code, payload_dict).
+    """
+    if not target_cwd or not isinstance(target_cwd, str):
+        return 400, {'error': 'invalid target_cwd'}
+    target_cwd = target_cwd.strip()
+    if (not target_cwd
+        or not target_cwd.startswith('/')
+        or '\x00' in target_cwd
+        or any(p == '..' for p in target_cwd.split('/'))):
+        return 400, {'error': 'invalid target_cwd'}
+    src = find_session_file(sid)
+    if not src:
+        return 404, {'error': 'not found'}
+
+    target_folder = cwd_to_folder(target_cwd)
+    dst_dir = src.parent.parent / target_folder
+    dst = dst_dir / f'{sid}.jsonl'
+
+    # No-op if already there
+    try:
+        if src.resolve() == dst.resolve():
+            return 200, {'ok': True, 'noop': True, 'id': sid,
+                         'project_folder': target_folder, 'cwd': target_cwd}
+    except Exception:
+        pass
+
+    if dst.exists():
+        return 409, {'error': 'a session with this id already exists in target project'}
+
+    tmp = None
+    try:
+        dst_dir.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_suffix('.jsonl.tmp')
+        with open(src, 'r', encoding='utf-8', errors='replace') as fr, \
+             open(tmp, 'w', encoding='utf-8') as fw:
+            for line in fr:
+                line = line.rstrip('\n')
+                if not line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                    if isinstance(obj, dict) and 'cwd' in obj:
+                        obj['cwd'] = target_cwd
+                    fw.write(json.dumps(obj, ensure_ascii=False) + '\n')
+                except Exception:
+                    fw.write(line + '\n')
+        os.replace(tmp, dst)
+        tmp = None
+
+        # Move any subagent/session subdirectory alongside
+        sub_src = src.parent / sid
+        if sub_src.exists() and sub_src.is_dir():
+            sub_dst = dst_dir / sid
+            if not sub_dst.exists():
+                shutil.move(str(sub_src), str(sub_dst))
+
+        src.unlink()
+    except Exception as e:
+        if tmp is not None:
+            try: tmp.unlink()
+            except Exception: pass
+        return 500, {'error': str(e)}
+
+    return 200, {'ok': True, 'id': sid,
+                 'project_folder': target_folder, 'cwd': target_cwd}
+
+
 def application(environ, start_response):
     path = environ.get('PATH_INFO', '') or '/'
     method = environ.get('REQUEST_METHOD', 'GET').upper()
@@ -301,6 +378,17 @@ def application(environ, start_response):
         if method == 'GET':
             return json_response(start_response, {'sessions': list_sessions()})
         return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
+
+    m_move = re.match(r'^/sessions/([0-9a-fA-F-]{36})/move$', path)
+    if m_move:
+        sid = m_move.group(1)
+        if method != 'POST':
+            return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
+        payload = read_body(environ)
+        status_code, body = move_session(sid, payload.get('target_cwd', ''))
+        status_map = {200: '200 OK', 400: '400 Bad Request', 404: '404 Not Found',
+                      409: '409 Conflict', 500: '500 Internal Server Error'}
+        return json_response(start_response, body, status_map.get(status_code, '500 Internal Server Error'))
 
     m = re.match(r'^/sessions/([0-9a-fA-F-]{36})$', path)
     if m:

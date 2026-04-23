@@ -66,7 +66,9 @@
     sort: localStorage.getItem('cs:sort') || 'recent',
     lang: null,          // resolved after loading i18n/index.json
     editing: null,
+    moving: null,        // { ids: [...], target: cwd-string|null }
     collapsed: new Set(loadCollapsed()),
+    selected: new Set(), // session IDs in bulk selection
   };
 
   // ----- DOM helpers -----
@@ -165,6 +167,20 @@
 
   async function deleteSession(id) {
     const res = await fetch(`${API}/sessions/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    return res.json();
+  }
+
+  async function moveSession(id, targetCwd) {
+    const res = await fetch(`${API}/sessions/${id}/move`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_cwd: targetCwd }),
+    });
     if (!res.ok) {
       let msg = `HTTP ${res.status}`;
       try { msg = (await res.json()).error || msg; } catch (_) {}
@@ -442,6 +458,10 @@
     if (s.favorite) classes.push('favorite');
     if (s.deleted) classes.push('deleted');
 
+    if (state.selected.has(s.id)) classes.push('selected');
+
+    const selectBtn = `<button class="card-select" data-action="select" type="button" aria-pressed="${state.selected.has(s.id)}" aria-label="${escapeHtml(t('card.action.select'))}" data-tooltip="${escapeHtml(t('card.action.select'))}">${icon('check')}</button>`;
+
     const titleHtml = displayName
       ? `<div class="card-title">${escapeHtml(displayName)}</div>`
       : `<div class="card-title unnamed">${escapeHtml(truncate(preview, 140) || t('card.untitled'))}</div>`;
@@ -468,14 +488,16 @@
         <button class="card-action primary" data-action="copy" data-tooltip="${escapeHtml(t('card.action.copy', { id: s.id }))}">${icon('copy')}${escapeHtml(t('card.action.copyLabel'))}</button>
         <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" data-tooltip="${escapeHtml(favLabel)}" aria-label="${escapeHtml(favLabel)}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
         <button class="card-action" data-action="edit" data-tooltip="${escapeHtml(t('card.action.edit'))}" aria-label="${escapeHtml(t('card.action.editAria'))}">${icon('edit')}</button>
+        <button class="card-action" data-action="move" data-tooltip="${escapeHtml(t('card.action.move'))}" aria-label="${escapeHtml(t('card.action.move'))}">${icon('move')}</button>
         <button class="card-action danger" data-action="delete" data-tooltip="${escapeHtml(t('card.action.delete'))}" aria-label="${escapeHtml(t('card.action.delete'))}">${icon('trash')}</button>
       `;
 
     return `
       <article class="${classes.join(' ')}" data-id="${s.id}" tabindex="0" role="button" aria-label="${escapeHtml(displayName || truncate(preview, 60) || s.id)}">
-        <span class="card-id">${s.id.slice(0, 8)}</span>
+        ${selectBtn}
         <div class="card-head">${titleHtml}</div>
         ${descHtml}
+        <span class="card-id" data-tooltip="${escapeHtml(s.id)}">${s.id.slice(0, 8)}</span>
         <div class="card-meta">${meta.join('')}</div>
         <div class="card-actions">${actions}</div>
       </article>
@@ -531,10 +553,239 @@
     container.innerHTML = html;
   }
 
-  function render() { renderSidebar(); renderContent(); }
+  function render() { pruneSelection(); renderSidebar(); renderContent(); renderBulkBar(); }
+
+  // Drop selected IDs that no longer exist or are not visible under current filter
+  function pruneSelection() {
+    if (!state.selected.size) return;
+    const visibleIds = new Set(state.sessions.filter(baseVisible).map(s => s.id));
+    for (const id of [...state.selected]) {
+      if (!visibleIds.has(id)) state.selected.delete(id);
+    }
+  }
+
+  function selectionItems() {
+    return [...state.selected]
+      .map(id => state.sessions.find(s => s.id === id))
+      .filter(Boolean);
+  }
+
+  function clearSelection() {
+    if (!state.selected.size) return;
+    state.selected.clear();
+    render();
+  }
+
+  function toggleSelect(id) {
+    if (state.selected.has(id)) state.selected.delete(id);
+    else state.selected.add(id);
+    render();
+  }
+
+  function renderBulkBar() {
+    const n = state.selected.size;
+    document.body.classList.toggle('has-selection', n > 0);
+    if (!n) return;
+    const items = selectionItems();
+    $('#bulk-n').textContent = String(n);
+    $('#bulk-noun').textContent = n === 1 ? t('bulk.count.singular') : t('bulk.count.plural');
+    const inTrash = state.filter === 'trash';
+    $('#bulk-fav').hidden = inTrash;
+    $('#bulk-move').hidden = inTrash;
+    $('#bulk-trash').hidden = inTrash;
+    $('#bulk-restore').hidden = !inTrash;
+    $('#bulk-purge').hidden = !inTrash;
+    if (!inTrash) {
+      const allFav = items.length > 0 && items.every(s => s.favorite);
+      $('#bulk-fav-label').textContent = allFav ? t('bulk.unfavorite') : t('bulk.favorite');
+    }
+  }
+
+  // ----- Bulk actions -----
+  async function bulkFavorite() {
+    const items = selectionItems();
+    if (!items.length) return;
+    const allFav = items.every(s => s.favorite);
+    const next = !allFav;
+    try {
+      await Promise.all(items.map(s => patchSession(s.id, { favorite: next })));
+      items.forEach(s => { s.favorite = next; });
+      render();
+      toast(t(next ? 'toast.bulk.favorited' : 'toast.bulk.unfavorited', { n: items.length }), 'success');
+    } catch (e) {
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
+    }
+  }
+
+  async function bulkTrash() {
+    const items = selectionItems();
+    if (!items.length) return;
+    const ok = await confirmDialog({
+      title: t('confirm.bulkTrash.title', { n: items.length }),
+      message: t('confirm.bulkTrash.msg'),
+      confirmLabel: t('confirm.bulkTrash.btn'),
+      variant: 'warning',
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(items.map(s => patchSession(s.id, { deleted: true })));
+      items.forEach(s => { s.deleted = true; });
+      state.selected.clear();
+      render();
+      toast(t('toast.bulk.trashed', { n: items.length }), 'success');
+    } catch (e) {
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
+    }
+  }
+
+  async function bulkRestore() {
+    const items = selectionItems();
+    if (!items.length) return;
+    try {
+      await Promise.all(items.map(s => patchSession(s.id, { deleted: false })));
+      items.forEach(s => { s.deleted = false; });
+      state.selected.clear();
+      render();
+      toast(t('toast.bulk.restored', { n: items.length }), 'success');
+    } catch (e) {
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
+    }
+  }
+
+  async function bulkPurge() {
+    const items = selectionItems();
+    if (!items.length) return;
+    const ok = await confirmDialog({
+      title: t('confirm.bulkPurge.title', { n: items.length }),
+      message: t('confirm.bulkPurge.msg'),
+      confirmLabel: t('confirm.bulkPurge.btn'),
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const results = await Promise.allSettled(items.map(s => deleteSession(s.id)));
+    const okIds = new Set();
+    results.forEach((r, i) => { if (r.status === 'fulfilled') okIds.add(items[i].id); });
+    state.sessions = state.sessions.filter(s => !okIds.has(s.id));
+    state.selected.clear();
+    render();
+    const failed = results.length - okIds.size;
+    if (failed) toast(t('toast.bulk.purgedPartial', { ok: okIds.size, fail: failed }), 'error');
+    else toast(t('toast.bulk.purged', { n: okIds.size }), 'success');
+  }
+
+  function bulkMove() {
+    const ids = [...state.selected];
+    if (!ids.length) return;
+    openMoveModal(ids);
+  }
+
+  // ----- Move modal -----
+  function moveCandidates() {
+    if (!state.moving) return [];
+    const items = state.moving.ids
+      .map(id => state.sessions.find(s => s.id === id))
+      .filter(Boolean);
+    const sourceCwds = new Set(items.map(s => s.cwd).filter(Boolean));
+    // Only exclude when all sources share one project — for mixed selections we
+    // still let the user consolidate into one of the source projects.
+    const exclude = sourceCwds.size === 1 ? sourceCwds : new Set();
+    const m = new Map();
+    for (const s of state.sessions) {
+      if (s.deleted) continue;
+      const cwd = s.cwd;
+      if (!cwd || exclude.has(cwd)) continue;
+      if (!m.has(cwd)) m.set(cwd, { cwd, count: 0 });
+      m.get(cwd).count += 1;
+    }
+    return [...m.values()].sort((a, b) => b.count - a.count);
+  }
+
+  function openMoveModal(ids) {
+    if (!ids || !ids.length) return;
+    state.moving = { ids: [...ids], target: null };
+    const items = ids.map(id => state.sessions.find(s => s.id === id)).filter(Boolean);
+    const sourceCwds = [...new Set(items.map(s => s.cwd).filter(Boolean))];
+    $('#move-title').textContent = ids.length === 1
+      ? t('move.title')
+      : t('move.titleBulk', { n: ids.length });
+    if (sourceCwds.length === 1) {
+      $('#move-intro').innerHTML = t('move.intro.from', { from: `<code>${escapeHtml(prettyCwd(sourceCwds[0]))}</code>` });
+    } else {
+      $('#move-intro').textContent = t('move.intro.mixed');
+    }
+    $('#move-search').value = '';
+    $('#move-confirm').disabled = true;
+    renderMoveList();
+    $('#move-modal').classList.remove('hidden');
+    $('#move-modal').setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#move-search').focus(), 30);
+  }
+
+  function renderMoveList(query = '') {
+    const q = query.trim().toLowerCase();
+    const all = moveCandidates();
+    const list = q
+      ? all.filter(p => (p.cwd + ' ' + (projectShortName(p.cwd) || '')).toLowerCase().includes(q))
+      : all;
+    const host = $('#move-list');
+    if (!list.length) {
+      host.innerHTML = `<div class="move-empty">${escapeHtml(t('move.empty'))}</div>`;
+      return;
+    }
+    host.innerHTML = list.map(p => {
+      const sel = state.moving && state.moving.target === p.cwd ? 'selected' : '';
+      return `
+        <button class="move-item ${sel}" type="button" role="option" data-cwd="${escapeHtml(p.cwd)}" aria-selected="${!!sel}">
+          ${icon('folder')}
+          <span class="name">${escapeHtml(projectShortName(p.cwd))}</span>
+          <span class="path">${escapeHtml(prettyCwd(p.cwd))}</span>
+          <span class="count">${p.count}</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  function closeMoveModal() {
+    state.moving = null;
+    $('#move-modal').classList.add('hidden');
+    $('#move-modal').setAttribute('aria-hidden', 'true');
+  }
+
+  async function confirmMove() {
+    const m = state.moving;
+    if (!m || !m.target || !m.ids.length) return;
+    const target = m.target;
+    const ids = [...m.ids];
+    closeMoveModal();
+    const results = await Promise.allSettled(ids.map(id => moveSession(id, target)));
+    const okIds = new Set();
+    results.forEach((r, i) => { if (r.status === 'fulfilled') okIds.add(ids[i]); });
+    state.selected.clear();
+    try { state.sessions = await fetchSessions(); } catch (_) {}
+    render();
+    const failed = results.length - okIds.size;
+    if (failed && !okIds.size) {
+      const firstErr = results.find(r => r.status === 'rejected');
+      toast(t('toast.error', { msg: escapeHtml(firstErr?.reason?.message || 'move failed') }), 'error');
+    } else if (failed) {
+      toast(t('toast.bulk.movedPartial', { ok: okIds.size, fail: failed }), 'error');
+    } else if (okIds.size > 1) {
+      toast(t('toast.bulk.moved', { n: okIds.size }), 'success');
+    } else {
+      toast(t('toast.moved'), 'success');
+    }
+  }
 
   // ----- Actions -----
   async function handleAction(action, s, cardEl) {
+    if (action === 'select') {
+      toggleSelect(s.id);
+      return;
+    }
+    if (action === 'move') {
+      openMoveModal([s.id]);
+      return;
+    }
     if (action === 'copy') {
       const cmd = `claude --resume ${s.id}`;
       const ok = await copyToClipboard(cmd);
@@ -653,11 +904,27 @@
     // Close modal
     if (ev.target.closest('[data-close]')) { closeEditor(); return; }
 
+    // Close move modal
+    if (ev.target.closest('[data-move-close]')) { closeMoveModal(); return; }
+
+    // Move list item selection
+    const moveItem = ev.target.closest('.move-item');
+    if (moveItem && state.moving) {
+      state.moving.target = moveItem.dataset.cwd;
+      $$('.move-item', $('#move-list')).forEach(el => {
+        el.classList.toggle('selected', el === moveItem);
+        el.setAttribute('aria-selected', el === moveItem ? 'true' : 'false');
+      });
+      $('#move-confirm').disabled = false;
+      return;
+    }
+
     // Sidebar: filter
     const filterBtn = ev.target.closest('.nav-item[data-filter]');
     if (filterBtn) {
       state.filter = filterBtn.dataset.filter;
       state.project = null;
+      state.selected.clear();
       document.body.classList.remove('sidebar-open');
       render();
       return;
@@ -668,6 +935,7 @@
     if (projectBtn) {
       const key = projectBtn.dataset.project;
       state.project = state.project === key ? null : key;
+      state.selected.clear();
       document.body.classList.remove('sidebar-open');
       render();
       return;
@@ -700,8 +968,16 @@
     const s = state.sessions.find(x => x.id === sid);
     if (!s) return;
     const actionBtn = ev.target.closest('[data-action]');
-    const action = actionBtn ? actionBtn.dataset.action : 'copy';
     if (actionBtn) ev.stopPropagation();
+    // In selection mode, clicking the card body (not an action button) toggles selection
+    let action;
+    if (actionBtn) {
+      action = actionBtn.dataset.action;
+    } else if (state.selected.size > 0) {
+      action = 'select';
+    } else {
+      action = 'copy';
+    }
     try {
       await handleAction(action, s, card);
     } catch (e) {
@@ -717,7 +993,9 @@
       return;
     }
     if (e.key === 'Escape') {
+      if (!$('#move-modal').classList.contains('hidden')) { closeMoveModal(); return; }
       if (!$('#modal').classList.contains('hidden')) { closeEditor(); return; }
+      if (state.selected.size > 0) { clearSelection(); return; }
       if ($('#search') === document.activeElement) { $('#search').value = ''; state.query = ''; render(); $('#search').blur(); return; }
       if (document.body.classList.contains('sidebar-open')) { document.body.classList.remove('sidebar-open'); return; }
     }
@@ -763,6 +1041,18 @@
   if (sortSel) sortSel.value = state.sort;
 
   $('#edit-save').addEventListener('click', saveEditor);
+
+  // Bulk bar
+  $('#bulk-fav').addEventListener('click', bulkFavorite);
+  $('#bulk-move').addEventListener('click', bulkMove);
+  $('#bulk-trash').addEventListener('click', bulkTrash);
+  $('#bulk-restore').addEventListener('click', bulkRestore);
+  $('#bulk-purge').addEventListener('click', bulkPurge);
+  $('#bulk-clear').addEventListener('click', clearSelection);
+
+  // Move modal
+  $('#move-confirm').addEventListener('click', confirmMove);
+  $('#move-search').addEventListener('input', (e) => renderMoveList(e.target.value));
 
   // ----- i18n application -----
   function applyI18n(root = document) {
@@ -933,6 +1223,7 @@
         try { await loadLang(I18N_DEFAULT); } catch (_) {}
       }
     }
+
     document.documentElement.setAttribute('lang', state.lang);
     document.documentElement.setAttribute('data-lang', state.lang);
     renderLangSwitch();
