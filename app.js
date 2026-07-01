@@ -462,9 +462,12 @@
 
     const selectBtn = `<button class="card-select" data-action="select" type="button" aria-pressed="${state.selected.has(s.id)}" aria-label="${escapeHtml(t('card.action.select'))}" data-tooltip="${escapeHtml(t('card.action.select'))}">${icon('check')}</button>`;
 
+    // Full title for the hover tooltip — reveals the complete name when the
+    // visible title is clamped to 2 lines (or the preview is truncated).
+    const fullTitle = displayName || truncate(preview, 300) || t('card.untitled');
     const titleHtml = displayName
-      ? `<div class="card-title">${escapeHtml(displayName)}</div>`
-      : `<div class="card-title unnamed">${escapeHtml(truncate(preview, 140) || t('card.untitled'))}</div>`;
+      ? `<div class="card-title" data-tooltip="${escapeHtml(fullTitle)}">${escapeHtml(displayName)}</div>`
+      : `<div class="card-title unnamed" data-tooltip="${escapeHtml(fullTitle)}">${escapeHtml(truncate(preview, 140) || t('card.untitled'))}</div>`;
 
     const descHtml = s.description
       ? `<div class="card-desc">${escapeHtml(s.description)}</div>`

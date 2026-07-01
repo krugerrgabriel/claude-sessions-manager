@@ -3,7 +3,13 @@ import os
 import pwd
 import re
 import shutil
+import threading
 from pathlib import Path
+
+# Serializes read-modify-write on metadata.json. WSGIDaemonProcess runs this
+# module with threads=5, so bulk operations fire concurrent PATCH/DELETE
+# requests; without this lock they clobber each other's changes (lost updates).
+_META_LOCK = threading.Lock()
 
 
 def _resolve_home():
@@ -42,9 +48,19 @@ def _read_json(path, default):
 
 def _write_json_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + '.tmp')
-    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
-    os.replace(tmp, path)
+    # Unique tmp name per process+thread so concurrent writers never collide on
+    # a shared tmp file — otherwise one thread's os.replace consumes it and the
+    # other's raises FileNotFoundError (surfaced to the client as HTTP 500).
+    tmp = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
+        raise
 
 
 def load_metadata():
@@ -396,22 +412,23 @@ def application(environ, start_response):
 
         if method in ('PATCH', 'POST', 'PUT'):
             payload = read_body(environ)
-            metadata = load_metadata()
-            entry = metadata.get(sid, {})
-            for key in ('name', 'description', 'favorite', 'deleted'):
-                if key in payload:
-                    val = payload[key]
-                    if key in ('favorite', 'deleted'):
-                        val = bool(val)
-                    elif isinstance(val, str):
-                        val = val.strip()
-                    entry[key] = val
-            # Drop empty defaults to keep file clean
-            if not entry.get('name') and not entry.get('description') and not entry.get('favorite') and not entry.get('deleted'):
-                metadata.pop(sid, None)
-            else:
-                metadata[sid] = entry
-            save_metadata(metadata)
+            with _META_LOCK:
+                metadata = load_metadata()
+                entry = metadata.get(sid, {})
+                for key in ('name', 'description', 'favorite', 'deleted'):
+                    if key in payload:
+                        val = payload[key]
+                        if key in ('favorite', 'deleted'):
+                            val = bool(val)
+                        elif isinstance(val, str):
+                            val = val.strip()
+                        entry[key] = val
+                # Drop empty defaults to keep file clean
+                if not entry.get('name') and not entry.get('description') and not entry.get('favorite') and not entry.get('deleted'):
+                    metadata.pop(sid, None)
+                else:
+                    metadata[sid] = entry
+                save_metadata(metadata)
             return json_response(start_response, {'ok': True, 'id': sid, 'meta': entry})
 
         if method == 'DELETE':
@@ -427,10 +444,11 @@ def application(environ, start_response):
                 return json_response(start_response, {'error': f'permission denied: {e}'}, '403 Forbidden')
             except Exception as e:
                 return json_response(start_response, {'error': str(e)}, '500 Internal Server Error')
-            metadata = load_metadata()
-            if sid in metadata:
-                metadata.pop(sid, None)
-                save_metadata(metadata)
+            with _META_LOCK:
+                metadata = load_metadata()
+                if sid in metadata:
+                    metadata.pop(sid, None)
+                    save_metadata(metadata)
             return json_response(start_response, {'ok': True, 'deleted': sid})
 
         return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
