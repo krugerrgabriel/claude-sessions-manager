@@ -519,8 +519,10 @@ def _root_surface(installer_bytes):
 def _stamp_assets(index_html, version):
     """Append ?v=<version> to the stylesheet and script URLs.
 
-    Apache sends no Cache-Control for these, so browsers cache them
-    heuristically for days; a stamped URL is one such a cache has never seen,
+    Mirrors what install.sh does at install time. Apache sends no
+    Cache-Control for these two, only index.html and the dictionaries
+    revalidate, so browsers cache them heuristically for days; a stamped URL
+    is one such a cache has never seen,
     which is what stops an update from rendering with the previous release's
     CSS. The reload after a self-update revalidates index.html itself, so the
     new stamps are picked up.

@@ -66,6 +66,9 @@ else
 fi
 
 a2enmod wsgi >/dev/null 2>&1 || true
+# mod_headers carries the Cache-Control below. The config guards on it with
+# <IfModule>, so a build without it still starts, just without revalidation.
+a2enmod headers >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
 # 2. Directory structure
@@ -90,6 +93,25 @@ if [ "$(realpath "$SRC_DIR")" != "$(realpath "$INSTALL_DIR")" ]; then
     log "Copying i18n/ dictionaries"
     install -d -m 0755 "$INSTALL_DIR/i18n"
     install -m 0644 "$SRC_DIR/i18n/"*.json "$INSTALL_DIR/i18n/"
+
+    # Release notes, one file per language per version. Optional: installing
+    # from a tree without them just falls back to the GitHub release body.
+    if [ -d "$SRC_DIR/notes" ]; then
+      log "Copying notes/ release notes"
+      find "$SRC_DIR/notes" -type f -name '*.md' -printf '%P\n' | while IFS= read -r rel; do
+        install -D -m 0644 "$SRC_DIR/notes/$rel" "$INSTALL_DIR/notes/$rel"
+      done
+    fi
+
+    # Stamp the asset URLs with the version so an update is never rendered
+    # with the previous release's CSS. Apache sends no Cache-Control here, so
+    # browsers cache these heuristically for days; a stamped URL is one such a
+    # cache has never seen. Idempotent, an existing stamp is replaced.
+    VER="$(cat "$SRC_DIR/VERSION" 2>/dev/null | tr -d '[:space:]')"
+    if [ -n "$VER" ]; then
+      sed -i -E "s|(href=\"style\.css)(\?v=[^\"]*)?\"|\1?v=$VER\"|; s|(src=\"app\.js)(\?v=[^\"]*)?\"|\1?v=$VER\"|" \
+        "$INSTALL_DIR/index.html"
+    fi
   else
     echo "✗ missing directory: $SRC_DIR/i18n" >&2
     exit 1
@@ -131,6 +153,22 @@ SetEnv CLAUDE_SESSIONS_SRC_DIR "$SRC_DIR"
     # so this must never answer anything but this machine.
     Require local
     DirectoryIndex index.html
+
+    # Without an explicit Cache-Control, Apache sends only Last-Modified and
+    # ETag, and browsers fall back to heuristic caching: roughly 10% of the
+    # file's age, which for a months-old file is days.
+    #
+    # Only two things need to revalidate. index.html cannot cache-bust itself,
+    # and it is what points at the version-stamped asset URLs, so a stale copy
+    # keeps requesting the old unstamped ones. The i18n dictionaries are
+    # fetched by a fixed name and gain keys between releases. Everything else
+    # is either stamped (style.css, app.js) or lives at a per-version path
+    # (notes/), so it can be cached freely.
+    <IfModule mod_headers.c>
+        <FilesMatch "\.(html|json)\$">
+            Header set Cache-Control "no-cache, must-revalidate"
+        </FilesMatch>
+    </IfModule>
 </Directory>
 
 # The WSGI alias is not governed by the <Directory> block on every Apache
