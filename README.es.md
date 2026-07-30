@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Tu punto de partida diario para <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
-  Retoma cualquier conversación justo donde la dejaste — sin volver a explicar el proyecto, sin perder el contexto.
+  Retoma cualquier conversación justo donde la dejaste, sin volver a explicar el proyecto, sin perder el contexto.
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@ Eso es lo que resuelve este proyecto. En 4 pasos:
 
 1. 🏁 Abres el panel
 2. 🎯 Encuentras la conversación correcta
-3. 📋 Haces clic — el comando ya está en el portapapeles
+3. 📋 Haces clic y el comando ya está en el portapapeles
 4. 💻 Lo pegas en el terminal y sigues donde lo dejaste
 
 > **Retomar cuesta segundos. Volver a empezar cuesta horas.**
@@ -56,16 +56,22 @@ Eso es lo que resuelve este proyecto. En 4 pasos:
 | | |
 |---|---|
 | 🔁 **Retomar con 1 clic** | Haz clic en una conversación → el comando para retomar queda en el portapapeles al instante |
+| 📋 **Formato de copia** | Elige en la cabecera si el botón copiar entrega `claude --resume` (terminal) o `/resume` (dentro de Claude), o que pregunte cada vez |
 | 🏷️ **Nombres y notas** | Dale un nombre humano a cada conversación y anota dónde la dejaste |
 | ⭐ **Favoritas** | Destaca las conversaciones que usas a diario |
-| 🗑️ **Papelera segura** | Archiva las antiguas sin miedo — la eliminación definitiva exige doble confirmación |
+| 🗑️ **Papelera segura** | Archiva las antiguas sin miedo: la eliminación definitiva exige doble confirmación |
+| ☑️ **Selección múltiple** | Marca varias conversaciones y favorítalas, muévelas, archívalas o elimínalas de una vez |
+| 🗂️ **Mover entre proyectos** | Envía una conversación a otro proyecto; el `cwd` se reescribe en cada línea del archivo |
 | 🔍 **Búsqueda instantánea** | Filtra por nombre, notas, proyecto, rama o por lo que se dijo en la conversación |
+| ↕️ **Ordenación** | Por última actividad, contexto consumido, tamaño en disco o nombre |
 | 📁 **Agrupación por proyecto** | Conversaciones organizadas por el proyecto al que pertenecen, con contador en la barra lateral |
-| 📊 **Información útil** | Contexto consumido, tamaño, rama, última actividad — todo visible en la tarjeta |
+| 📊 **Información útil** | Contexto consumido, tamaño, rama, última actividad, todo visible en la tarjeta |
 | 🌡️ **Aviso de saturación** | Las conversaciones cerca de llenar la ventana de contexto se destacan en amarillo y rojo |
-| ⌨️ **Atajos de teclado** | `/` buscar, `Esc` cerrar, `Enter` retomar — sin levantar las manos del teclado |
+| ⌨️ **Atajos de teclado** | `/` buscar, `Esc` cerrar, `Enter` retomar, sin levantar las manos del teclado |
 | 🌗 **Tema oscuro suave** | Diseño pensado para horas frente a la pantalla, con acento terracota inspirado en Claude |
 | ♿ **Accesible** | Navegación por teclado, contraste adecuado, respeta "reducir movimiento" del sistema |
+| 🌍 **7 idiomas** | Português, English, Español, 日本語, 简体中文, 한국어, Deutsch. Cámbialo en la barra lateral |
+| 🔔 **Aviso de actualización** | Te avisa cuando hay una versión nueva y copia el comando de actualización |
 
 ---
 
@@ -84,7 +90,7 @@ cd claude-sessions-manager
 sudo ./install.sh
 ```
 
-El instalador se encarga de todo — instala lo que falta, copia los archivos, ajusta los permisos y configura el servidor web. Termina en segundos.
+El instalador se encarga de todo, instala lo que falta, copia los archivos, ajusta los permisos y configura el servidor web. Termina en segundos.
 
 ### 3️⃣ Ábrelo en el navegador
 
@@ -104,7 +110,7 @@ o
 claude-sessions-manager
 ```
 
-El instalador crea ese comando automáticamente — abre el panel en tu navegador predeterminado.
+El instalador crea ese comando automáticamente, abre el panel en tu navegador predeterminado.
 
 Listo. 🎉
 
@@ -114,7 +120,7 @@ Listo. 🎉
 
 ## ⚙️ Configuración avanzada
 
-Úsalas solo si las necesitas — todo funciona de fábrica.
+Úsalas solo si las necesitas, todo funciona de fábrica.
 
 <details>
 <summary><strong>Instalar en otra ruta o URL</strong></summary>
@@ -149,7 +155,7 @@ sudo ./uninstall.sh --purge   # lo elimina todo, incluidas tus notas
 | Tecla | Acción |
 |---|---|
 | `/` | Enfocar el buscador |
-| `Esc` | Cerrar modal, limpiar búsqueda o cerrar menú móvil |
+| `Esc` | Cerrar modal, limpiar selección, limpiar búsqueda o cerrar menú móvil |
 | `Enter` / `Space` | Retomar la conversación enfocada |
 | `Ctrl+Enter` | Guardar cambios (dentro del modal) |
 
@@ -193,6 +199,8 @@ claude-sessions-manager/
 ├── style.css        ← design system (tema oscuro)
 ├── app.js           ← lógica de render y API
 ├── app.wsgi         ← backend Python
+├── i18n/            ← diccionarios de traducción (un JSON por idioma)
+├── VERSION          ← versión actual, sincronizada con el último release
 ├── install.sh       ← instalador
 ├── uninstall.sh     ← desinstalador
 ├── README.md        ← estás aquí
@@ -205,10 +213,10 @@ claude-sessions-manager/
 
 ## 🔒 Seguridad
 
-- El backend corre **como tú**, no como `www-data` — lee tus sesiones sin un `chmod` global.
+- El backend corre **como tú**, no como `www-data`, lee tus sesiones sin un `chmod` global.
 - La API solo acepta IDs en formato UUID (sin path traversal).
 - La eliminación permanente exige doble confirmación en el frontend.
-- Sirve solo en **http://localhost** por defecto — **no lo expongas a internet** sin autenticación.
+- Sirve solo en **http://localhost** por defecto, **no lo expongas a internet** sin autenticación.
 
 ---
 
@@ -239,7 +247,7 @@ sudo tail -20 /var/log/apache2/error.log
 ```
 
 Causas comunes:
-- `~/.claude/projects/` aún no existe — usa Claude Code al menos una vez
+- `~/.claude/projects/` aún no existe, usa Claude Code al menos una vez
 - `mod_wsgi` no está activo: `sudo a2enmod wsgi && sudo systemctl reload apache2`
 </details>
 
@@ -283,7 +291,7 @@ PRs bienvenidos. Antes de enviar:
 
 ## 📜 Licencia
 
-MIT — haz lo que quieras.
+MIT, haz lo que quieras.
 
 ---
 

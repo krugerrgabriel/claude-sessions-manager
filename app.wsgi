@@ -3,6 +3,7 @@ import os
 import pwd
 import re
 import shutil
+import subprocess
 import threading
 from pathlib import Path
 
@@ -10,6 +11,11 @@ from pathlib import Path
 # module with threads=5, so bulk operations fire concurrent PATCH/DELETE
 # requests; without this lock they clobber each other's changes (lost updates).
 _META_LOCK = threading.Lock()
+
+# Serializes self-update. Two overlapping updates would race on the very files
+# they are replacing, app.wsgi included. Held non-blocking: a second caller is
+# told the update is already running rather than queued behind it.
+_UPDATE_LOCK = threading.Lock()
 
 
 def _resolve_home():
@@ -33,6 +39,12 @@ PROJECTS_DIR = Path(
 META_FILE = BASE / 'data' / 'metadata.json'
 CACHE_FILE = BASE / 'cache' / 'sessions.json'
 
+# The git clone this was installed from, recorded by install.sh as a SetEnv.
+# Apache's SetEnv lands in the per-request WSGI environ rather than the
+# process environment, so the request value wins and this is only the fallback
+# for someone exporting it before starting Apache.
+SRC_DIR_FALLBACK = os.environ.get('CLAUDE_SESSIONS_SRC_DIR') or ''
+
 MAX_LINES_SCAN = 200  # limit per-file scan to avoid reading huge files
 PREVIEW_LEN = 400
 
@@ -49,7 +61,7 @@ def _read_json(path, default):
 def _write_json_atomic(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     # Unique tmp name per process+thread so concurrent writers never collide on
-    # a shared tmp file — otherwise one thread's os.replace consumes it and the
+    # a shared tmp file; otherwise one thread's os.replace consumes it and the
     # other's raises FileNotFoundError (surfaced to the client as HTTP 500).
     tmp = path.with_name(f'{path.name}.{os.getpid()}.{threading.get_ident()}.tmp')
     try:
@@ -63,8 +75,34 @@ def _write_json_atomic(path, data):
         raise
 
 
+class MetadataUnreadable(Exception):
+    """metadata.json exists but could not be read or parsed.
+
+    Raised instead of quietly returning {}. A caller that swallowed this and
+    then saved would wipe every name, note and favorite the user ever wrote.
+    Write paths must refuse; read paths may degrade to "no metadata"."""
+
+
 def load_metadata():
-    return _read_json(META_FILE, {})
+    """Return the metadata dict.
+
+    Missing (or empty) file → {}. Present but unreadable/corrupt →
+    MetadataUnreadable, so the caller can decide instead of clobbering it."""
+    if not META_FILE.exists():
+        return {}
+    try:
+        raw = META_FILE.read_text(encoding='utf-8')
+    except OSError as e:
+        raise MetadataUnreadable(f'cannot read {META_FILE}: {e}')
+    if not raw.strip():
+        return {}
+    try:
+        data = json.loads(raw)
+    except ValueError as e:
+        raise MetadataUnreadable(f'{META_FILE} is not valid JSON: {e}')
+    if not isinstance(data, dict):
+        raise MetadataUnreadable(f'{META_FILE} is not a JSON object')
+    return data
 
 
 def save_metadata(data):
@@ -213,13 +251,23 @@ def count_lines(path):
 
 
 def list_sessions():
-    metadata = load_metadata()
+    """Return (sessions, meta_error).
+
+    Listing still works when metadata.json is unreadable: the sessions just
+    come back without names/notes, but meta_error is surfaced to the client so
+    the missing names read as a fault, not as "you never named anything"."""
+    try:
+        metadata = load_metadata()
+        meta_error = None
+    except MetadataUnreadable as e:
+        metadata = {}
+        meta_error = str(e)
     cache = load_cache()
     new_cache = {}
     sessions = []
 
     if not PROJECTS_DIR.exists():
-        return sessions
+        return sessions, meta_error
 
     for project_dir in sorted(PROJECTS_DIR.iterdir()):
         if not project_dir.is_dir():
@@ -270,7 +318,7 @@ def list_sessions():
 
     save_cache(new_cache)
     sessions.sort(key=lambda s: s['mtime'], reverse=True)
-    return sessions
+    return sessions, meta_error
 
 
 def find_session_file(session_id):
@@ -311,9 +359,16 @@ def read_body(environ):
 
 def cwd_to_folder(cwd):
     """Encode an absolute cwd path to the Claude project folder name.
-    Mirrors how Claude Code names directories under ~/.claude/projects/.
-    Example: '/home/u/proj' → '-home-u-proj'."""
-    return '-' + cwd.lstrip('/').replace('/', '-')
+    Mirrors how Claude Code names directories under ~/.claude/projects/:
+    EVERY character outside [A-Za-z0-9] collapses to '-', not just the path
+    separators. Underscores, dots, spaces and accented letters all fold too;
+    case is preserved.
+        '/home/u/proj'      → '-home-u-proj'
+        '/home/u/my_app'    → '-home-u-my-app'
+        '/home/u/Lideranca' → '-home-u-Lideran-a'   (with a cedilla)
+    Getting this wrong drops the moved session into a folder Claude Code never
+    reads, so `claude --resume <id>` can no longer find it."""
+    return re.sub(r'[^A-Za-z0-9]', '-', cwd)
 
 
 def move_session(sid, target_cwd):
@@ -386,13 +441,164 @@ def move_session(sid, target_cwd):
                  'project_folder': target_folder, 'cwd': target_cwd}
 
 
+# Files install.sh copies into place. Kept in sync with its copy loop; app.wsgi
+# goes last so the mod_wsgi reload it triggers finds everything else already
+# updated.
+INSTALL_FILES = ('index.html', 'style.css', 'VERSION', 'app.js', 'app.wsgi')
+
+
+def _is_local(environ):
+    """True only for requests originating on this machine.
+
+    The update endpoint runs git and rewrites the running application, so it is
+    restricted here regardless of how permissive the Apache config happens to
+    be."""
+    return environ.get('REMOTE_ADDR') in ('127.0.0.1', '::1')
+
+
+def _is_local_host_header(environ):
+    """Reject a Host that is not a loopback name.
+
+    REMOTE_ADDR alone is not enough: in a DNS rebinding attack a page served
+    from evil.com has its name re-pointed at 127.0.0.1, so the request is
+    same-origin for the browser (no CORS to block it) and arrives on loopback
+    (so REMOTE_ADDR passes). The Host header is what still says 'evil.com'."""
+    host = (environ.get('HTTP_HOST') or '').strip().lower()
+    if host.startswith('['):
+        # IPv6 literal: [::1] or [::1]:8080. Splitting on ':' first would cut
+        # the address itself in half.
+        host = host[1:].split(']', 1)[0]
+    else:
+        host = host.rsplit(':', 1)[0]
+    return host in ('localhost', '127.0.0.1', '::1', '')
+
+
+def _copy_atomic(src, dst):
+    """Copy via a temp file plus os.replace, the same idiom as
+    _write_json_atomic. A plain copyfile truncates the destination first, and
+    the destination here includes app.wsgi: an interrupted write would leave
+    the entire API unable to import."""
+    tmp = dst.with_name(f'{dst.name}.{os.getpid()}.{threading.get_ident()}.tmp')
+    try:
+        shutil.copyfile(src, tmp)
+        os.replace(tmp, dst)
+    except Exception:
+        try:
+            tmp.unlink()
+        except Exception:
+            pass
+        raise
+
+
+def _git(args, cwd, timeout=120):
+    p = subprocess.run(['git', '-C', str(cwd)] + args,
+                       capture_output=True, text=True, timeout=timeout)
+    return p.returncode, ((p.stdout or '') + (p.stderr or '')).strip()
+
+
+def self_update(src_dir):
+    """Pull the clone this was installed from and copy the new files into place.
+
+    Returns (status_code, body). The dashboard runs as the invoking user and
+    owns its own install directory, so nothing here needs root. What does need
+    root is Apache: whenever install.sh itself changed between the two
+    revisions the release may also change the vhost config, so we stop and ask
+    for the terminal rather than apply half an update."""
+    if not src_dir:
+        return 409, {'ok': False, 'reason': 'no-source',
+                     'detail': 'CLAUDE_SESSIONS_SRC_DIR is not set. Reinstall once '
+                               'so the dashboard learns where its clone lives.'}
+    src = Path(src_dir)
+    if not (src / '.git').exists():
+        return 409, {'ok': False, 'reason': 'no-source',
+                     'detail': f'{src} is not a git clone.'}
+
+    command = f'cd {src} && sudo ./install.sh'
+
+    try:
+        # Tracked changes only: an untracked stray (a __pycache__, an editor
+        # backup) does not stand in the way of a fast-forward, and treating it
+        # as dirty would block self-update forever for no reason. A pull that
+        # genuinely would overwrite an untracked file fails on its own below.
+        rc, out = _git(['status', '--porcelain', '--untracked-files=no'], src)
+        if rc != 0:
+            return 409, {'ok': False, 'reason': 'git', 'detail': out, 'command': command}
+        if out:
+            # Never discard the user's own edits to their clone.
+            return 409, {'ok': False, 'reason': 'dirty', 'command': command,
+                         'detail': 'The clone has uncommitted changes:\n' + out}
+
+        installer = src / 'install.sh'
+        before = installer.read_bytes() if installer.exists() else b''
+
+        rc, out = _git(['pull', '--ff-only'], src)
+        if rc != 0:
+            return 409, {'ok': False, 'reason': 'git', 'detail': out, 'command': command}
+
+        if (installer.read_bytes() if installer.exists() else b'') != before:
+            # The pull already landed, so only the installer is still pending.
+            return 409, {'ok': False, 'reason': 'installer', 'command': command,
+                         'detail': 'install.sh changed in this release.'}
+
+        if src.resolve() != BASE.resolve():
+            for name in INSTALL_FILES:
+                s = src / name
+                if s.exists():
+                    _copy_atomic(s, BASE / name)
+            i18n_src = src / 'i18n'
+            if i18n_src.is_dir():
+                (BASE / 'i18n').mkdir(exist_ok=True)
+                for f in i18n_src.glob('*.json'):
+                    _copy_atomic(f, BASE / 'i18n' / f.name)
+
+        try:
+            version = (BASE / 'VERSION').read_text(encoding='utf-8').strip()
+        except OSError:
+            version = ''
+        return 200, {'ok': True, 'version': version}
+    except subprocess.TimeoutExpired:
+        return 409, {'ok': False, 'reason': 'git', 'command': command,
+                     'detail': 'git timed out. Check the network and try again.'}
+    except FileNotFoundError:
+        return 409, {'ok': False, 'reason': 'git', 'command': command,
+                     'detail': 'git is not installed.'}
+    except OSError as e:
+        return 409, {'ok': False, 'reason': 'copy', 'command': command, 'detail': str(e)}
+
+
 def application(environ, start_response):
     path = environ.get('PATH_INFO', '') or '/'
     method = environ.get('REQUEST_METHOD', 'GET').upper()
 
+    if path in ('/update', '/update/'):
+        if method != 'POST':
+            return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
+        if not _is_local(environ) or not _is_local_host_header(environ):
+            return json_response(start_response, {'error': 'local requests only'}, '403 Forbidden')
+        # A custom header cannot be sent cross-origin without a CORS preflight,
+        # and no CORS headers are served here, so this also stops a hostile page
+        # in the user's own browser from triggering an update.
+        if not environ.get('HTTP_X_CS_UPDATE'):
+            return json_response(start_response, {'error': 'missing X-CS-Update header'}, '403 Forbidden')
+        if not _UPDATE_LOCK.acquire(blocking=False):
+            return json_response(start_response, {
+                'ok': False, 'reason': 'busy',
+                'detail': 'An update is already running.',
+            }, '409 Conflict')
+        try:
+            code, body = self_update(environ.get('CLAUDE_SESSIONS_SRC_DIR') or SRC_DIR_FALLBACK)
+        finally:
+            _UPDATE_LOCK.release()
+        return json_response(start_response, body,
+                             '200 OK' if code == 200 else '409 Conflict')
+
     if path in ('/sessions', '/sessions/'):
         if method == 'GET':
-            return json_response(start_response, {'sessions': list_sessions()})
+            sessions, meta_error = list_sessions()
+            payload = {'sessions': sessions}
+            if meta_error:
+                payload['meta_error'] = meta_error
+            return json_response(start_response, payload)
         return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
 
     m_move = re.match(r'^/sessions/([0-9a-fA-F-]{36})/move$', path)
@@ -413,7 +619,15 @@ def application(environ, start_response):
         if method in ('PATCH', 'POST', 'PUT'):
             payload = read_body(environ)
             with _META_LOCK:
-                metadata = load_metadata()
+                try:
+                    metadata = load_metadata()
+                except MetadataUnreadable as e:
+                    # Never save on top of a file we could not read: doing so
+                    # replaces every name/note/favorite with this one entry.
+                    return json_response(start_response, {
+                        'error': f'{e}. Refusing to overwrite it. '
+                                 f'Fix or move the file, then retry.',
+                    }, '503 Service Unavailable')
                 entry = metadata.get(sid, {})
                 for key in ('name', 'description', 'favorite', 'deleted'):
                     if key in payload:
@@ -445,8 +659,15 @@ def application(environ, start_response):
             except Exception as e:
                 return json_response(start_response, {'error': str(e)}, '500 Internal Server Error')
             with _META_LOCK:
-                metadata = load_metadata()
-                if sid in metadata:
+                try:
+                    metadata = load_metadata()
+                except MetadataUnreadable:
+                    # The .jsonl is already gone, which is what the user asked
+                    # for. Skip the bookkeeping rather than rewrite a file we
+                    # can't read. The leftover entry is keyed by a session id
+                    # that no longer exists, so it is inert.
+                    metadata = None
+                if metadata is not None and sid in metadata:
                     metadata.pop(sid, None)
                     save_metadata(metadata)
             return json_response(start_response, {'ok': True, 'deleted': sid})

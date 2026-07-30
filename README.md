@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Your daily starting point for <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
-  Pick up any conversation right where you left off — no re-explaining the project, no lost context.
+  Pick up any conversation right where you left off, no re-explaining the project, no lost context.
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@ That's what this project solves. In 4 steps:
 
 1. 🏁 Open the dashboard
 2. 🎯 Find the right conversation
-3. 📋 Click — the command is already in your clipboard
+3. 📋 Click and the command is already in your clipboard
 4. 💻 Paste in the terminal and pick up where you left off
 
 > **Resuming costs seconds. Starting over costs hours.**
@@ -56,16 +56,22 @@ That's what this project solves. In 4 steps:
 | | |
 |---|---|
 | 🔁 **One-click resume** | Click a conversation → the resume command is copied to your clipboard instantly |
+| 📋 **Copy format** | Choose in the header whether the copy button hands you `claude --resume` (terminal) or `/resume` (inside Claude), or asks every time |
 | 🏷️ **Names and notes** | Give each conversation a human-readable name and jot down where you stopped |
 | ⭐ **Favorites** | Highlight the conversations you use every day |
-| 🗑️ **Safe trash bin** | Archive old ones without fear — permanent deletion requires double confirmation |
+| 🗑️ **Safe trash bin** | Archive old ones without fear: permanent deletion requires double confirmation |
+| ☑️ **Bulk selection** | Pick several conversations and favorite, move, trash or delete them in one shot |
+| 🗂️ **Move between projects** | Send a conversation to another project; the `cwd` is rewritten on every line of the file |
 | 🔍 **Instant search** | Filter by name, notes, project, branch, or by what was said in the conversation |
+| ↕️ **Sorting** | By last activity, context consumed, size on disk or name |
 | 📁 **Grouped by project** | Conversations organized by the project they belong to, with a sidebar counter |
-| 📊 **Useful info** | Context consumed, size, branch, last activity — all visible on the card |
+| 📊 **Useful info** | Context consumed, size, branch, last activity, all visible on the card |
 | 🌡️ **Saturation warning** | Conversations close to filling the context window are highlighted in yellow and red |
-| ⌨️ **Keyboard shortcuts** | `/` search, `Esc` close, `Enter` resume — without lifting your hands off the keyboard |
+| ⌨️ **Keyboard shortcuts** | `/` search, `Esc` close, `Enter` resume, without lifting your hands off the keyboard |
 | 🌗 **Soft dark theme** | Visual designed for hours on screen, with a terracotta accent inspired by Claude |
 | ♿ **Accessible** | Keyboard navigation, proper contrast, honors the system's "reduce motion" setting |
+| 🌍 **7 languages** | Português, English, Español, 日本語, 简体中文, 한국어, Deutsch. Switch it in the sidebar |
+| 🔔 **Update notice** | Tells you when a new release is out and copies the update command |
 
 ---
 
@@ -84,7 +90,7 @@ cd claude-sessions-manager
 sudo ./install.sh
 ```
 
-The installer takes care of everything — it installs what's missing, copies the files, adjusts permissions, and configures the web server. Finishes in seconds.
+The installer takes care of everything: it installs what's missing, copies the files, adjusts permissions, and configures the web server. Finishes in seconds.
 
 ### 3️⃣ Open it in your browser
 
@@ -104,7 +110,7 @@ or
 claude-sessions-manager
 ```
 
-The installer creates that command automatically — it opens the dashboard in your default browser.
+The installer creates that command automatically: it opens the dashboard in your default browser.
 
 Done. 🎉
 
@@ -114,7 +120,7 @@ Done. 🎉
 
 ## ⚙️ Advanced configuration
 
-Only use these if you need to — everything works out of the box.
+Only use these if you need to, everything works out of the box.
 
 <details>
 <summary><strong>Install in a different path or URL</strong></summary>
@@ -149,7 +155,7 @@ sudo ./uninstall.sh --purge   # removes everything, including your notes
 | Key | Action |
 |---|---|
 | `/` | Focus the search input |
-| `Esc` | Close modal, clear search, or close mobile menu |
+| `Esc` | Close modal, clear selection, clear search, or close mobile menu |
 | `Enter` / `Space` | Resume the focused conversation |
 | `Ctrl+Enter` | Save edits (inside the modal) |
 
@@ -193,6 +199,8 @@ claude-sessions-manager/
 ├── style.css        ← design system (dark theme)
 ├── app.js           ← rendering and API logic
 ├── app.wsgi         ← Python backend
+├── i18n/            ← translation dictionaries (one JSON per language)
+├── VERSION          ← current version, synced from the latest release
 ├── install.sh       ← installer
 ├── uninstall.sh     ← uninstaller
 ├── README.md        ← you are here
@@ -205,10 +213,10 @@ claude-sessions-manager/
 
 ## 🔒 Security
 
-- The backend runs **as you**, not as `www-data` — it reads your sessions without a global `chmod`.
+- The backend runs **as you**, not as `www-data`. It reads your sessions without a global `chmod`.
 - The API only accepts IDs in UUID format (no path traversal).
 - Permanent deletion requires double confirmation in the frontend.
-- Serves only on **http://localhost** by default — **do not expose it to the internet** without authentication.
+- Serves only on **http://localhost** by default. **Do not expose it to the internet** without authentication.
 
 ---
 
@@ -239,7 +247,7 @@ sudo tail -20 /var/log/apache2/error.log
 ```
 
 Common causes:
-- `~/.claude/projects/` doesn't exist yet — run Claude Code at least once
+- `~/.claude/projects/` doesn't exist yet, run Claude Code at least once
 - `mod_wsgi` isn't enabled: `sudo a2enmod wsgi && sudo systemctl reload apache2`
 </details>
 
@@ -283,7 +291,7 @@ PRs welcome. Before submitting:
 
 ## 📜 License
 
-MIT — do whatever you want.
+MIT, do whatever you want.
 
 ---
 

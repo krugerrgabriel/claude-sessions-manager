@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Seu ponto de partida diário para o <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
-  Retome qualquer conversa de onde parou — sem re-explicar o projeto, sem perder contexto.
+  Retome qualquer conversa de onde parou, sem re-explicar o projeto, sem perder contexto.
 </p>
 
 <p align="center">
@@ -43,7 +43,7 @@ São **15–30 minutos só pra começar a produzir**. E quando o terminal fecha,
 
 1. 🏁 Abre a dashboard
 2. 🎯 Acha a conversa certa
-3. 📋 Clica — o comando já está no clipboard
+3. 📋 Clica, o comando já está no clipboard
 4. 💻 Cola no terminal e continua de onde parou
 
 > **Retomar custa segundos. Recomeçar custa horas.**
@@ -55,16 +55,22 @@ São **15–30 minutos só pra começar a produzir**. E quando o terminal fecha,
 | | |
 |---|---|
 | 🔁 **Retomar com 1 clique** | Clique numa conversa → o comando de retomar fica no clipboard na hora |
+| 📋 **Formato da cópia** | Escolha no header se o botão copiar entrega `claude --resume` (terminal) ou `/resume` (dentro do Claude), ou pergunta toda vez |
 | 🏷️ **Nomes e anotações** | Dê um nome humano pra cada conversa e anote em que ponto você parou |
 | ⭐ **Favoritos** | Destaque as conversas que você usa todo dia |
-| 🗑️ **Lixeira segura** | Arquive antigas sem medo — exclusão definitiva só com confirmação dupla |
+| 🗑️ **Lixeira segura** | Arquive antigas sem medo: exclusão definitiva só com confirmação dupla |
+| ☑️ **Seleção em lote** | Marque várias conversas e favorite, mova, arquive ou exclua de uma vez |
+| 🗂️ **Mover entre projetos** | Envie uma conversa para outro projeto; o `cwd` é reescrito em todas as linhas do arquivo |
 | 🔍 **Busca instantânea** | Filtra por nome, anotação, projeto, branch ou pelo que foi dito na conversa |
+| ↕️ **Ordenação** | Por última atividade, contexto consumido, tamanho em disco ou nome |
 | 📁 **Agrupamento por projeto** | Conversas organizadas pelo projeto em que estavam, com contador na lateral |
-| 📊 **Informações úteis** | Quanto contexto consumiu, tamanho, branch, última atividade — tudo visível no card |
+| 📊 **Informações úteis** | Quanto contexto consumiu, tamanho, branch, última atividade, tudo visível no card |
 | 🌡️ **Aviso de saturação** | Conversas perto de estourar o contexto aparecem destacadas em amarelo e vermelho |
-| ⌨️ **Atalhos de teclado** | `/` busca, `Esc` fecha, `Enter` retoma — sem tirar a mão do teclado |
+| ⌨️ **Atalhos de teclado** | `/` busca, `Esc` fecha, `Enter` retoma, sem tirar a mão do teclado |
 | 🌗 **Tema escuro suave** | Visual pensado pra horas de tela, com acento terracotta inspirado na Claude |
 | ♿ **Acessível** | Navegação por teclado, contraste adequado, respeita "reduzir movimento" do sistema |
+| 🌍 **7 idiomas** | Português, English, Español, 日本語, 简体中文, 한국어, Deutsch. Troca na barra lateral |
+| 🔔 **Aviso de atualização** | Avisa quando sai uma versão nova e copia o comando de atualizar |
 
 ---
 
@@ -83,7 +89,7 @@ cd claude-sessions-manager
 sudo ./install.sh
 ```
 
-O instalador cuida de tudo sozinho — instala o que falta, copia os arquivos, ajusta as permissões e configura o servidor web. Termina em segundos.
+O instalador cuida de tudo sozinho: instala o que falta, copia os arquivos, ajusta as permissões e configura o servidor web. Termina em segundos.
 
 ### 3️⃣ Abra no navegador
 
@@ -103,7 +109,7 @@ ou
 claude-sessions-manager
 ```
 
-O instalador cria esse comando automaticamente — ele abre o dashboard no seu navegador padrão.
+O instalador cria esse comando automaticamente e ele abre o dashboard no seu navegador padrão.
 
 Pronto. 🎉
 
@@ -113,7 +119,7 @@ Pronto. 🎉
 
 ## ⚙️ Configurações avançadas
 
-Use só se precisar — tudo funciona de fábrica.
+Use só se precisar, tudo funciona de fábrica.
 
 <details>
 <summary><strong>Instalar em outro caminho ou URL</strong></summary>
@@ -148,7 +154,7 @@ sudo ./uninstall.sh --purge   # remove tudo, inclusive as anotações
 | Tecla | Ação |
 |---|---|
 | `/` | Focar a busca |
-| `Esc` | Fechar modal, limpar busca ou fechar menu mobile |
+| `Esc` | Fechar modal, limpar seleção, limpar busca ou fechar menu mobile |
 | `Enter` / `Space` | Retomar a conversa em foco |
 | `Ctrl+Enter` | Salvar edição (no modal) |
 
@@ -192,6 +198,8 @@ claude-sessions-manager/
 ├── style.css        ← design system (tema escuro)
 ├── app.js           ← lógica de render e API
 ├── app.wsgi         ← backend Python
+├── i18n/            ← dicionários de tradução (um JSON por idioma)
+├── VERSION          ← versão atual, sincronizada com o último release
 ├── install.sh       ← instalador
 ├── uninstall.sh     ← desinstalador
 ├── README.md        ← você está aqui
@@ -204,10 +212,10 @@ claude-sessions-manager/
 
 ## 🔒 Segurança
 
-- O backend roda **como você**, não como `www-data` — lê suas sessões sem `chmod` global.
+- O backend roda **como você**, não como `www-data`, lê suas sessões sem `chmod` global.
 - A API só aceita IDs em formato UUID (sem path traversal).
 - Exclusão permanente exige confirmação dupla no frontend.
-- Serve só em **http://localhost** por padrão — **não exponha pra internet** sem autenticação.
+- Serve só em **http://localhost** por padrão, **não exponha pra internet** sem autenticação.
 
 ---
 
@@ -238,7 +246,7 @@ sudo tail -20 /var/log/apache2/error.log
 ```
 
 Causas comuns:
-- `~/.claude/projects/` ainda não existe — use o Claude Code pelo menos uma vez
+- `~/.claude/projects/` ainda não existe, use o Claude Code pelo menos uma vez
 - `mod_wsgi` não habilitado: `sudo a2enmod wsgi && sudo systemctl reload apache2`
 </details>
 
@@ -282,7 +290,7 @@ PRs bem-vindos. Antes de mandar:
 
 ## 📜 Licença
 
-MIT — faça o que quiser.
+MIT, faça o que quiser.
 
 ---
 

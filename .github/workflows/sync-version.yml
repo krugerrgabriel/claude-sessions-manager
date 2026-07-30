@@ -14,7 +14,7 @@ permissions:
 jobs:
   sync-version:
     runs-on: ubuntu-latest
-    # Skip drafts and prereleases — only sync the canonical "latest" release
+    # Skip drafts and prereleases: only sync the canonical "latest" release
     if: ${{ !github.event.release.draft && !github.event.release.prerelease }}
     steps:
       - name: Checkout default branch
@@ -37,7 +37,7 @@ jobs:
       - name: Commit and push if changed
         run: |
           if git diff --quiet VERSION; then
-            echo "VERSION already matches release — nothing to commit."
+            echo "VERSION already matches release, nothing to commit."
             exit 0
           fi
           git config user.name  "github-actions[bot]"

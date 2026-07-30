@@ -58,12 +58,23 @@
     return s;
   }
 
+  // How the resume command is handed over. 'ask' pops the chooser every time.
+  const COPY_MODES = ['terminal', 'inline', 'ask'];
+  function loadCopyMode() {
+    try {
+      const v = localStorage.getItem('cs:copyMode');
+      if (COPY_MODES.includes(v)) return v;
+    } catch (_) {}
+    return 'terminal';
+  }
+
   const state = {
     sessions: [],
     filter: 'all',       // all | favorites | trash
     project: null,       // cwd of active project, null = all
     query: '',
     sort: localStorage.getItem('cs:sort') || 'recent',
+    copyMode: loadCopyMode(),   // terminal | inline | ask
     lang: null,          // resolved after loading i18n/index.json
     editing: null,
     moving: null,        // { ids: [...], target: cwd-string|null }
@@ -148,10 +159,19 @@
   }
 
   // ----- API -----
+  // Warn once per page load, not on every refresh/move.
+  let metaErrorReported = false;
+
   async function fetchSessions() {
     const res = await fetch(`${API}/sessions`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    // Sessions still list when metadata.json can't be read, but the missing
+    // names would otherwise look like the user never wrote any. Say it out loud.
+    if (data.meta_error && !metaErrorReported) {
+      metaErrorReported = true;
+      toast(t('toast.error', { msg: escapeHtml(data.meta_error) }), 'error', { duration: 8000 });
+    }
     return data.sessions || [];
   }
 
@@ -161,7 +181,11 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
     return res.json();
   }
 
@@ -305,6 +329,195 @@
     return { hide };
   })();
 
+  // ----- Dropdown: progressive enhancement over a native <select> -----
+  // The <select> stays in the DOM as the source of truth, so applyI18n keeps
+  // translating its <option>s and existing 'change' listeners keep firing:
+  // choosing an item just writes select.value and dispatches 'change'.
+  const ddInstances = [];
+  const ddOpen = new Set();
+  let ddSeq = 0;
+
+  function enhanceSelect(select, { icon: leadIcon, align = 'left', hints = {} } = {}) {
+    if (!select || select.dataset.ddEnhanced) return null;
+    select.dataset.ddEnhanced = '1';
+    select.classList.add('dd-native');
+    select.setAttribute('tabindex', '-1');
+    select.setAttribute('aria-hidden', 'true');
+
+    const panelId = `dd-panel-${++ddSeq}`;
+    const dd = document.createElement('div');
+    dd.className = 'dd';
+    dd.dataset.open = 'false';
+    dd.innerHTML = `
+      <!-- role=button, not combobox: focus moves into the listbox on open, and
+           the combobox pattern expects focus to stay put with
+           aria-activedescendant. Matching the role to the actual interaction
+           is what screen readers announce correctly. -->
+      <button class="dd-trigger" type="button" aria-haspopup="listbox"
+              aria-expanded="false" aria-controls="${panelId}">
+        ${leadIcon ? `<svg class="icon dd-lead" aria-hidden="true"><use href="#i-${leadIcon}"></use></svg>` : ''}
+        <span class="dd-value"></span>
+        <svg class="icon dd-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
+      </button>
+      <div class="dd-panel" id="${panelId}" role="listbox" hidden></div>
+    `;
+    select.parentNode.insertBefore(dd, select.nextSibling);
+    const trigger = $('.dd-trigger', dd);
+    const panel = $('.dd-panel', dd);
+
+    function sync() {
+      const current = select.selectedOptions[0];
+      // The visible label sits in a grid cell shared with one hidden ghost per
+      // option, so the cell is always as wide as the longest one and the
+      // trigger stops resizing every time the selection changes. Measuring in
+      // JS would race the async webfont; CSS re-fits itself when it lands.
+      $('.dd-value', dd).innerHTML = `
+        <span class="dd-value-text">${escapeHtml(current ? current.textContent : '')}</span>
+        ${[...select.options].map(o =>
+          `<span class="dd-value-ghost" aria-hidden="true">${escapeHtml(o.textContent)}</span>`).join('')}
+      `;
+      trigger.setAttribute('aria-label', select.getAttribute('aria-label') || '');
+      panel.innerHTML = [...select.options].map(o => `
+        <button class="dd-option" type="button" role="option" tabindex="-1"
+                data-value="${escapeHtml(o.value)}" aria-selected="${o.value === select.value}">
+          <svg class="icon dd-check" aria-hidden="true"><use href="#i-check"></use></svg>
+          <span class="dd-option-label">${escapeHtml(o.textContent)}</span>
+          ${hints[o.value] ? `<code class="dd-option-hint">${escapeHtml(hints[o.value])}</code>` : ''}
+        </button>
+      `).join('');
+    }
+
+    function place() {
+      const r = trigger.getBoundingClientRect();
+      panel.hidden = false;
+      panel.style.minWidth = `${r.width}px`;
+      const m = 8;
+      // clientWidth/clientHeight, not innerWidth/innerHeight: a fixed element
+      // is anchored to the viewport *inside* the scrollbar, while innerWidth
+      // counts the scrollbar, and the difference shifts the panel by its width.
+      const vw = document.documentElement.clientWidth;
+      const vh = document.documentElement.clientHeight;
+      // Cap the width here rather than in CSS: a `100vw` cap would include the
+      // scrollbar gutter that clientWidth excludes, and the two disagreeing is
+      // what lets the panel spill past the edge on a very narrow window.
+      // Must precede the measurement below, or w/h describe the uncapped box.
+      panel.style.maxWidth = `${Math.min(340, vw - m * 2)}px`;
+      // offsetWidth/offsetHeight rather than getBoundingClientRect: the panel
+      // plays a scale-in animation, and the rect reports the mid-animation
+      // size, and positioning off that leaves the panel a few px adrift once it
+      // settles.
+      const w = panel.offsetWidth, h = panel.offsetHeight;
+      if (align === 'right') {
+        // Anchor by the right edge, so the panel's width never enters the
+        // maths and it cannot drift past the edge of the screen.
+        panel.style.left = 'auto';
+        panel.style.right = `${Math.max(m, vw - r.right)}px`;
+      } else {
+        panel.style.right = 'auto';
+        panel.style.left = `${Math.max(m, Math.min(r.left, vw - w - m))}px`;
+      }
+      // Flip above when there is no room below. This is what lets the
+      // language picker at the bottom of the sidebar open upwards.
+      let top = r.bottom + 6;
+      if (top + h > vh - m) top = r.top - h - 6;
+      panel.style.top = `${Math.max(m, top)}px`;
+    }
+
+    function open() {
+      if (dd.dataset.open === 'true') return;
+      sync();
+      place();
+      dd.dataset.open = 'true';
+      trigger.setAttribute('aria-expanded', 'true');
+      ddOpen.add(api);
+      // preventScroll: the panel is position:fixed, so scrolling it into view
+      // is pointless, and the scroll it fires is exactly what dismisses the
+      // panel below.
+      ($('.dd-option[aria-selected="true"]', panel) || panel.firstElementChild)
+        ?.focus({ preventScroll: true });
+      // Scrolling dismisses the panel. Arming a frame late is load-bearing:
+      // anything the act of opening emits (the focus above, the browser
+      // restoring scroll position right after load) would otherwise close the
+      // panel the instant it appeared. Listeners live only while it is open.
+      requestAnimationFrame(() => {
+        if (dd.dataset.open !== 'true') return;
+        window.addEventListener('scroll', onDismiss, true);
+        window.addEventListener('resize', onDismiss);
+      });
+    }
+
+    function onDismiss() { close(false); }
+
+    function close(refocus) {
+      if (dd.dataset.open !== 'true') return;
+      dd.dataset.open = 'false';
+      trigger.setAttribute('aria-expanded', 'false');
+      panel.hidden = true;
+      ddOpen.delete(api);
+      window.removeEventListener('scroll', onDismiss, true);
+      window.removeEventListener('resize', onDismiss);
+      if (refocus) trigger.focus({ preventScroll: true });
+    }
+
+    function choose(value) {
+      if (value == null) return;
+      if (select.value !== value) {
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      sync();
+      close(true);
+    }
+
+    function move(where) {
+      const items = $$('.dd-option', panel);
+      if (!items.length) return;
+      const i = items.indexOf(document.activeElement);
+      const next = where === 'home' ? 0
+        : where === 'end' ? items.length - 1
+        : i < 0 ? 0
+        : (i + (where === 'next' ? 1 : -1) + items.length) % items.length;
+      items[next].focus();
+    }
+
+    trigger.addEventListener('click', () => (dd.dataset.open === 'true' ? close(true) : open()));
+    trigger.addEventListener('keydown', (e) => {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); open(); }
+    });
+    panel.addEventListener('click', (e) => {
+      const opt = e.target.closest('.dd-option');
+      if (opt) choose(opt.dataset.value);
+    });
+    panel.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowDown': e.preventDefault(); move('next'); break;
+        case 'ArrowUp':   e.preventDefault(); move('prev'); break;
+        case 'Home':      e.preventDefault(); move('home'); break;
+        case 'End':       e.preventDefault(); move('end');  break;
+        case 'Enter':
+        case ' ':         e.preventDefault(); choose(document.activeElement?.dataset?.value); break;
+        // stopPropagation so Esc doesn't also run the global chain (clear
+        // selection, close a modal) while a dropdown is what's open.
+        case 'Escape':    e.stopPropagation(); close(true); break;
+        case 'Tab':       close(false); break;
+      }
+    });
+
+    const api = { sync, close, el: dd, trigger };
+    ddInstances.push(api);
+    sync();
+    return api;
+  }
+
+  function syncDropdowns() { ddInstances.forEach(d => d.sync()); }
+
+  // Click-outside is safe as a permanent listener: at mousedown time on the
+  // trigger the panel is still shut, so it can't fight the opening click.
+  document.addEventListener('mousedown', (e) => {
+    [...ddOpen].forEach(d => { if (!d.el.contains(e.target)) d.close(false); });
+  }, true);
+  document.addEventListener('cs:lang-changed', syncDropdowns);
+
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -320,6 +533,59 @@
       document.body.removeChild(ta);
       return ok;
     }
+  }
+
+  // ----- Resume command -----
+  // 'terminal' → pasted into a shell with Claude Code closed: starts a new
+  //              session on this conversation.
+  // 'inline'   → pasted into an already-open Claude Code: switches the running
+  //              session over to this conversation.
+  function resumeCommand(id, mode) {
+    return mode === 'inline' ? `/resume ${id}` : `claude --resume ${id}`;
+  }
+
+  async function doCopy(s, mode, cardEl) {
+    const cmd = resumeCommand(s.id, mode);
+    const ok = await copyToClipboard(cmd);
+    if (!ok) { toast(t('toast.copyFailed'), 'error'); return; }
+    toast(t('toast.copied', { cmd: escapeHtml(cmd) }), 'success');
+    if (cardEl) {
+      cardEl.classList.add('copied');
+      setTimeout(() => cardEl.classList.remove('copied'), 1200);
+    }
+  }
+
+  // Resolves to 'terminal' | 'inline', or null when the user backs out.
+  function askCopyMode(s) {
+    return new Promise(resolve => {
+      const modal = $('#copy-modal');
+      // Show the real command for THIS session, not a placeholder.
+      $$('[data-cmd]', modal).forEach(el => {
+        el.textContent = resumeCommand(s.id, el.dataset.cmd);
+      });
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      const first = $('.copy-option', modal);
+      setTimeout(() => first && first.focus(), 20);
+
+      const cleanup = () => {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+        modal.removeEventListener('click', onClick);
+        document.removeEventListener('keydown', onKey, true);
+      };
+      const onClick = (e) => {
+        const opt = e.target.closest('.copy-option');
+        if (opt) { cleanup(); resolve(opt.dataset.mode); return; }
+        if (e.target.closest('[data-copy-close]')) { cleanup(); resolve(null); }
+      };
+      // Capture + stopPropagation so the global Esc chain doesn't also fire.
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.stopPropagation(); cleanup(); resolve(null); }
+      };
+      modal.addEventListener('click', onClick);
+      document.addEventListener('keydown', onKey, true);
+    });
   }
 
   // ----- Filtering -----
@@ -462,7 +728,7 @@
 
     const selectBtn = `<button class="card-select" data-action="select" type="button" aria-pressed="${state.selected.has(s.id)}" aria-label="${escapeHtml(t('card.action.select'))}" data-tooltip="${escapeHtml(t('card.action.select'))}">${icon('check')}</button>`;
 
-    // Full title for the hover tooltip — reveals the complete name when the
+    // Full title for the hover tooltip. It reveals the complete name when the
     // visible title is clamped to 2 lines (or the preview is truncated).
     const fullTitle = displayName || truncate(preview, 300) || t('card.untitled');
     const titleHtml = displayName
@@ -482,13 +748,16 @@
     meta.push(`<span class="meta-pill" data-tooltip="${escapeHtml(fullDate(s.mtime))}">${icon('clock')}${prettyDate(s.mtime)}</span>`);
 
     const favLabel = s.favorite ? t('card.action.unfavorite') : t('card.action.favorite');
+    const copyTip = state.copyMode === 'ask'
+      ? t('card.action.copyAsk')
+      : t('card.action.copy', { cmd: resumeCommand(s.id, state.copyMode) });
     const actions = s.deleted
       ? `
         <button class="card-action success" data-action="restore" data-tooltip="${escapeHtml(t('card.action.restore'))}" aria-label="${escapeHtml(t('card.action.restore'))}">${icon('rotate')}</button>
         <button class="card-action danger" data-action="purge" data-tooltip="${escapeHtml(t('card.action.purge'))}" aria-label="${escapeHtml(t('card.action.purge'))}">${icon('x')}</button>
       `
       : `
-        <button class="card-action primary" data-action="copy" data-tooltip="${escapeHtml(t('card.action.copy', { id: s.id }))}">${icon('copy')}${escapeHtml(t('card.action.copyLabel'))}</button>
+        <button class="card-action primary" data-action="copy" data-tooltip="${escapeHtml(copyTip)}">${icon('copy')}${escapeHtml(t('card.action.copyLabel'))}</button>
         <button class="card-action fav ${s.favorite ? 'on' : ''}" data-action="favorite" data-tooltip="${escapeHtml(favLabel)}" aria-label="${escapeHtml(favLabel)}">${icon(s.favorite ? 'star-filled' : 'star')}</button>
         <button class="card-action" data-action="edit" data-tooltip="${escapeHtml(t('card.action.edit'))}" aria-label="${escapeHtml(t('card.action.editAria'))}">${icon('edit')}</button>
         <button class="card-action" data-action="move" data-tooltip="${escapeHtml(t('card.action.move'))}" aria-label="${escapeHtml(t('card.action.move'))}">${icon('move')}</button>
@@ -500,7 +769,7 @@
         ${selectBtn}
         <div class="card-head">${titleHtml}</div>
         ${descHtml}
-        <span class="card-id" data-tooltip="${escapeHtml(s.id)}">${s.id.slice(0, 8)}</span>
+        <span class="card-id" data-tooltip="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>
         <div class="card-meta">${meta.join('')}</div>
         <div class="card-actions">${actions}</div>
       </article>
@@ -539,7 +808,12 @@
       const cwd = items[0].cwd;
       const folder = items[0].project_folder;
       const short = projectShortName(cwd) || folder;
-      const rest = prettyCwd(cwd, folder).replace(new RegExp(`/${short}$`), '');
+      // Strip the trailing "/<short>" by length, not by RegExp: a folder named
+      // "c++" or "a(b" would blow up new RegExp() and take the whole render
+      // down with it.
+      const full = prettyCwd(cwd, folder);
+      const suffix = `/${short}`;
+      const rest = full.endsWith(suffix) ? full.slice(0, -suffix.length) : full;
       const collapsed = state.collapsed.has(key);
       return `
         <section class="project-group ${collapsed ? 'collapsed' : ''}" data-group="${escapeHtml(key)}">
@@ -689,7 +963,7 @@
       .map(id => state.sessions.find(s => s.id === id))
       .filter(Boolean);
     const sourceCwds = new Set(items.map(s => s.cwd).filter(Boolean));
-    // Only exclude when all sources share one project — for mixed selections we
+    // Only exclude when all sources share one project. For mixed selections we
     // still let the user consolidate into one of the source projects.
     const exclude = sourceCwds.size === 1 ? sourceCwds : new Set();
     const m = new Map();
@@ -790,17 +1064,9 @@
       return;
     }
     if (action === 'copy') {
-      const cmd = `claude --resume ${s.id}`;
-      const ok = await copyToClipboard(cmd);
-      if (ok) {
-        toast(t('toast.copied', { cmd: escapeHtml(cmd) }), 'success');
-        if (cardEl) {
-          cardEl.classList.add('copied');
-          setTimeout(() => cardEl.classList.remove('copied'), 1200);
-        }
-      } else {
-        toast(t('toast.copyFailed'), 'error');
-      }
+      const mode = state.copyMode === 'ask' ? await askCopyMode(s) : state.copyMode;
+      if (!mode) return;   // chooser dismissed, copy nothing
+      await doCopy(s, mode, cardEl);
       return;
     }
     if (action === 'favorite') {
@@ -1043,6 +1309,17 @@
   const sortSel = $('#sort-select');
   if (sortSel) sortSel.value = state.sort;
 
+  // Copy-format selector (header)
+  const copyModeSel = $('#copy-mode');
+  if (copyModeSel) {
+    copyModeSel.value = state.copyMode;
+    copyModeSel.addEventListener('change', (e) => {
+      state.copyMode = COPY_MODES.includes(e.target.value) ? e.target.value : 'terminal';
+      try { localStorage.setItem('cs:copyMode', state.copyMode); } catch (_) {}
+      renderContent();   // the copy button's tooltip spells out the mode
+    });
+  }
+
   $('#edit-save').addEventListener('click', saveEditor);
 
   // Bulk bar
@@ -1098,14 +1375,20 @@
       const label = `${flag}${l.name}`;
       return `<option value="${escapeHtml(l.code)}">${escapeHtml(label)}</option>`;
     }).join('');
-    host.innerHTML = `
-      <select class="lang-select" id="lang-select" aria-label="${escapeHtml(t('lang.label'))}">
-        ${options}
-      </select>
-      <svg class="icon lang-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
-    `;
+    host.innerHTML = `<select id="lang-select" aria-label="${escapeHtml(t('lang.label'))}">${options}</select>`;
     const sel = $('#lang-select', host);
+    sel.value = state.lang;
     sel.addEventListener('change', (e) => setLang(e.target.value));
+    enhanceSelect(sel);
+  }
+
+  function setupDropdowns() {
+    enhanceSelect($('#copy-mode'), {
+      icon: 'copy',
+      align: 'right',   // it sits at the far edge of the header
+      hints: { terminal: 'claude --resume', inline: '/resume' },
+    });
+    enhanceSelect($('#sort-select'), { icon: 'sort' });
   }
 
   function syncLangButtons() {
@@ -1188,23 +1471,144 @@
     }
   }
 
+  // Opens when the update cannot be finished from here. `body` swaps the
+  // explanation between "this release needs the installer" and an outright
+  // failure; `detail` carries raw git/OS output, untranslated because it is
+  // diagnostic.
+  function openManualModal({ command, detail, body }) {
+    const modal = $('#manual-modal');
+    $('#manual-command').textContent = command || UPDATE_CMD;
+    $('#manual-body').textContent = body || t('update.manual.body');
+    const wrap = $('#manual-detail-wrap');
+    wrap.hidden = !detail;
+    wrap.open = false;
+    $('#manual-detail').textContent = detail || '';
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#manual-copy').focus(), 20);
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      modal.removeEventListener('click', onClick);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onClick = async (e) => {
+      if (e.target.closest('#manual-copy')) {
+        const cmd = $('#manual-command').textContent;
+        const ok = await copyToClipboard(cmd);
+        toast(ok ? t('toast.copied', { cmd: escapeHtml(cmd) }) : t('toast.copyFailed'),
+              ok ? 'success' : 'error');
+        return;
+      }
+      if (e.target.closest('[data-manual-close]')) cleanup();
+    };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); cleanup(); } };
+    modal.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey, true);
+  }
+
+  async function runSelfUpdate(btn) {
+    btn.classList.add('spinning');
+    btn.setAttribute('data-tooltip', t('update.applying'));
+    tooltip.hide();
+    let data = null;
+    try {
+      const res = await fetch(`${API}/update`, {
+        method: 'POST',
+        // Custom header: it cannot be sent cross-origin without a CORS
+        // preflight the server never answers, so no other site can fire this.
+        headers: { 'X-CS-Update': '1' },
+      });
+      data = await res.json();
+    } catch (e) {
+      data = { ok: false, reason: 'network', detail: e.message };
+    } finally {
+      btn.classList.remove('spinning');
+    }
+
+    if (data && data.ok) {
+      toast(t('update.done', { v: escapeHtml(data.version || '') }), 'success', { duration: 3000 });
+      // The new files are already in place; the reload is what picks them up.
+      setTimeout(() => location.reload(), 1200);
+      return;
+    }
+    openManualModal({
+      command: data && data.command,
+      detail: data && data.detail,
+      body: data && data.reason === 'installer' ? null : t('update.manual.bodyFailed'),
+    });
+  }
+
   function wireUpdateButton() {
     const btn = $('#update-btn');
     if (!btn) return;
     btn.addEventListener('click', async () => {
+      if (btn.classList.contains('spinning')) return;
       const state = btn.dataset.state;
       const local = btn.dataset.local || '?';
-      const latest = btn.dataset.latest || '?';
       if (state === 'outdated') {
-        const ok = await copyToClipboard(UPDATE_CMD);
-        if (ok) toast(t('update.copied', { cmd: escapeHtml(UPDATE_CMD), local, latest }), 'success', { duration: 4200 });
-        else toast(t('toast.copyFailed'), 'error');
+        await runSelfUpdate(btn);
       } else if (state === 'upToDate') {
         toast(t('update.upToDate', { local }), 'success');
       } else {
         toast(t('update.error'), 'error');
       }
     });
+  }
+
+  // ----- First-run coach mark -----
+  // Points at the copy-format picker once, the first time this build is
+  // opened, and never again. The key is new, so existing users get it too.
+  const COACH_KEY = 'cs:copyHintSeen';
+
+  function coachSeen() {
+    try { return localStorage.getItem(COACH_KEY) === '1'; } catch (_) { return true; }
+  }
+
+  function dismissCoach() {
+    const el = $('#coach');
+    if (!el || el.classList.contains('hidden')) return;
+    el.classList.add('hidden');
+    $('.dd', $('.copy-wrap'))?.classList.remove('coach-target');
+    try { localStorage.setItem(COACH_KEY, '1'); } catch (_) {}
+    document.removeEventListener('keydown', onCoachKey, true);
+    document.removeEventListener('mousedown', onCoachOutside, true);
+  }
+
+  const onCoachKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); dismissCoach(); } };
+  const onCoachOutside = (e) => {
+    if (!$('#coach').contains(e.target)) dismissCoach();
+  };
+
+  function showCoach() {
+    const el = $('#coach');
+    const target = $('.dd', $('.copy-wrap'));
+    if (!el || !target) return;
+
+    target.classList.add('coach-target');
+    el.classList.remove('hidden');
+
+    // Same clamp-to-viewport technique as the tooltip singleton.
+    const r = target.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const m = 10;
+    const vw = document.documentElement.clientWidth;   // excludes the scrollbar
+    let left = r.left + (r.width - box.width) / 2;
+    left = Math.max(m, Math.min(left, vw - box.width - m));
+    const top = r.bottom + 12;
+    el.style.left = `${left}px`;
+    el.style.top = `${top}px`;
+    // Keep the arrow under the control even after the box got clamped.
+    const arrowX = Math.max(12, Math.min(r.left + r.width / 2 - left - 6, box.width - 24));
+    $('.coach-arrow', el).style.left = `${arrowX}px`;
+
+    $('#coach-ok').addEventListener('click', dismissCoach, { once: true });
+    document.addEventListener('keydown', onCoachKey, true);
+    document.addEventListener('mousedown', onCoachOutside, true);
+    // Touching the picker itself counts as "got it".
+    $('#copy-mode')?.addEventListener('change', dismissCoach, { once: true });
   }
 
   // ----- Boot -----
@@ -1230,11 +1634,14 @@
     document.documentElement.setAttribute('lang', state.lang);
     document.documentElement.setAttribute('data-lang', state.lang);
     renderLangSwitch();
-    applyI18n();
+    applyI18n();          // must run before the dropdowns read their labels
+    setupDropdowns();
     syncLangButtons();
     wireUpdateButton();
     load();
     checkForUpdates();
+    // After layout settles, so the balloon anchors to the final header position.
+    if (!coachSeen()) setTimeout(showCoach, 500);
   }
 
   boot();

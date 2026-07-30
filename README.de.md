@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Dein täglicher Einstiegspunkt für <a href="https://claude.com/claude-code">Claude Code</a>.</strong><br>
-  Setze jede Unterhaltung genau dort fort, wo du aufgehört hast — ohne das Projekt erneut zu erklären, ohne Kontextverlust.
+  Setze jede Unterhaltung genau dort fort, wo du aufgehört hast, ohne das Projekt erneut zu erklären, ohne Kontextverlust.
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@ Genau das löst dieses Projekt. In 4 Schritten:
 
 1. 🏁 Dashboard öffnen
 2. 🎯 Die richtige Unterhaltung finden
-3. 📋 Klicken — der Befehl liegt schon in der Zwischenablage
+3. 📋 Klicken und der Befehl liegt schon in der Zwischenablage
 4. 💻 Im Terminal einfügen und dort weitermachen, wo du aufgehört hast
 
 > **Fortsetzen kostet Sekunden. Von vorn anfangen kostet Stunden.**
@@ -56,16 +56,22 @@ Genau das löst dieses Projekt. In 4 Schritten:
 | | |
 |---|---|
 | 🔁 **Mit 1 Klick fortsetzen** | Unterhaltung anklicken → der Fortsetzen-Befehl liegt sofort in der Zwischenablage |
+| 📋 **Kopierformat** | Im Header wählen, ob der Kopieren-Button `claude --resume` (Terminal) oder `/resume` (in Claude) liefert, oder jedes Mal fragt |
 | 🏷️ **Namen und Notizen** | Vergib einen menschenlesbaren Namen pro Unterhaltung und notiere, wo du aufgehört hast |
 | ⭐ **Favoriten** | Hebe die Unterhaltungen hervor, die du täglich nutzt |
-| 🗑️ **Sicherer Papierkorb** | Archiviere alte ohne Sorge — endgültiges Löschen erfordert doppelte Bestätigung |
+| 🗑️ **Sicherer Papierkorb** | Archiviere alte ohne Sorge: endgültiges Löschen erfordert doppelte Bestätigung |
+| ☑️ **Mehrfachauswahl** | Mehrere Unterhaltungen auswählen und in einem Rutsch favorisieren, verschieben, archivieren oder löschen |
+| 🗂️ **Zwischen Projekten verschieben** | Eine Unterhaltung in ein anderes Projekt schicken; `cwd` wird in jeder Zeile der Datei neu geschrieben |
 | 🔍 **Sofortige Suche** | Filtere nach Name, Notizen, Projekt, Branch oder Inhalt der Unterhaltung |
+| ↕️ **Sortierung** | Nach letzter Aktivität, verbrauchtem Kontext, Größe auf der Festplatte oder Name |
 | 📁 **Nach Projekt gruppiert** | Unterhaltungen nach zugehörigem Projekt organisiert, mit Zähler in der Seitenleiste |
-| 📊 **Nützliche Infos** | Verbrauchter Kontext, Größe, Branch, letzte Aktivität — alles auf der Karte sichtbar |
+| 📊 **Nützliche Infos** | Verbrauchter Kontext, Größe, Branch, letzte Aktivität, alles auf der Karte sichtbar |
 | 🌡️ **Sättigungswarnung** | Unterhaltungen nahe am Kontextfenster-Limit werden gelb und rot hervorgehoben |
-| ⌨️ **Tastaturkürzel** | `/` Suche, `Esc` schließen, `Enter` fortsetzen — ohne die Hände von der Tastatur zu nehmen |
+| ⌨️ **Tastaturkürzel** | `/` Suche, `Esc` schließen, `Enter` fortsetzen, ohne die Hände von der Tastatur zu nehmen |
 | 🌗 **Sanftes Dark Theme** | Design für stundenlange Bildschirmarbeit, mit von Claude inspiriertem Terrakotta-Akzent |
 | ♿ **Barrierefrei** | Tastaturnavigation, ausreichender Kontrast, respektiert die Systemeinstellung „Bewegung reduzieren" |
+| 🌍 **7 Sprachen** | Português, English, Español, 日本語, 简体中文, 한국어, Deutsch. In der Seitenleiste umschaltbar |
+| 🔔 **Update-Hinweis** | Meldet, wenn eine neue Version da ist, und kopiert den Update-Befehl |
 
 ---
 
@@ -84,7 +90,7 @@ cd claude-sessions-manager
 sudo ./install.sh
 ```
 
-Der Installer kümmert sich um alles — installiert, was fehlt, kopiert die Dateien, passt die Berechtigungen an und konfiguriert den Webserver. Fertig in Sekunden.
+Der Installer kümmert sich um alles, installiert, was fehlt, kopiert die Dateien, passt die Berechtigungen an und konfiguriert den Webserver. Fertig in Sekunden.
 
 ### 3️⃣ Im Browser öffnen
 
@@ -104,7 +110,7 @@ oder
 claude-sessions-manager
 ```
 
-Der Installer erstellt diesen Befehl automatisch — er öffnet das Dashboard in deinem Standardbrowser.
+Der Installer erstellt diesen Befehl automatisch, er öffnet das Dashboard in deinem Standardbrowser.
 
 Fertig. 🎉
 
@@ -114,7 +120,7 @@ Fertig. 🎉
 
 ## ⚙️ Erweiterte Konfiguration
 
-Nur verwenden, wenn nötig — alles funktioniert sofort.
+Nur verwenden, wenn nötig, alles funktioniert sofort.
 
 <details>
 <summary><strong>In anderen Pfad oder URL installieren</strong></summary>
@@ -149,7 +155,7 @@ sudo ./uninstall.sh --purge   # entfernt alles, einschließlich deiner Notizen
 | Taste | Aktion |
 |---|---|
 | `/` | Suche fokussieren |
-| `Esc` | Modal schließen, Suche leeren oder Mobilmenü schließen |
+| `Esc` | Modal schließen, Auswahl aufheben, Suche leeren oder Mobilmenü schließen |
 | `Enter` / `Space` | Die fokussierte Unterhaltung fortsetzen |
 | `Ctrl+Enter` | Änderungen speichern (im Modal) |
 
@@ -193,6 +199,8 @@ claude-sessions-manager/
 ├── style.css        ← Design-System (Dark Theme)
 ├── app.js           ← Render- und API-Logik
 ├── app.wsgi         ← Python-Backend
+├── i18n/            ← Übersetzungswörterbücher (ein JSON pro Sprache)
+├── VERSION          ← aktuelle Version, mit dem letzten Release synchronisiert
 ├── install.sh       ← Installer
 ├── uninstall.sh     ← Deinstaller
 ├── README.md        ← du bist hier
@@ -205,10 +213,10 @@ claude-sessions-manager/
 
 ## 🔒 Sicherheit
 
-- Das Backend läuft **als du**, nicht als `www-data` — es liest deine Sitzungen ohne globales `chmod`.
+- Das Backend läuft **als du**, nicht als `www-data`, es liest deine Sitzungen ohne globales `chmod`.
 - Die API akzeptiert nur IDs im UUID-Format (kein Path Traversal).
 - Endgültiges Löschen erfordert im Frontend doppelte Bestätigung.
-- Bedient standardmäßig nur **http://localhost** — **nicht ohne Authentifizierung ins Internet stellen**.
+- Bedient standardmäßig nur **http://localhost**, **nicht ohne Authentifizierung ins Internet stellen**.
 
 ---
 
@@ -239,7 +247,7 @@ sudo tail -20 /var/log/apache2/error.log
 ```
 
 Häufige Ursachen:
-- `~/.claude/projects/` existiert noch nicht — nutze Claude Code mindestens einmal
+- `~/.claude/projects/` existiert noch nicht, nutze Claude Code mindestens einmal
 - `mod_wsgi` ist nicht aktiviert: `sudo a2enmod wsgi && sudo systemctl reload apache2`
 </details>
 
@@ -283,7 +291,7 @@ PRs willkommen. Vor dem Absenden:
 
 ## 📜 Lizenz
 
-MIT — mach, was du willst.
+MIT, mach, was du willst.
 
 ---
 

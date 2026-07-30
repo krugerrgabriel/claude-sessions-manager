@@ -1,5 +1,5 @@
 /* =========================================================================
-   Claude Sessions — Design System
+   Claude Sessions Design System
    Style: Dark Mode (OLED) · Inter + JetBrains Mono · Claude terracotta accent
    ========================================================================= */
 
@@ -262,32 +262,8 @@ code, kbd, .mono { font-family: var(--ff-mono); }
   margin-bottom: 2px;
 }
 .lang-switch:empty { display: none; }
-.lang-select {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  padding: 8px 28px 8px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  color: var(--text-muted);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
-}
-.lang-select:hover { background: var(--surface-2); color: var(--text); border-color: var(--border-strong); }
-.lang-select:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); color: var(--text); }
-.lang-select option { background: var(--surface-2); color: var(--text); }
-.lang-chev {
-  position: absolute;
-  right: 8px;
-  width: 14px;
-  height: 14px;
-  color: var(--text-dim);
-  pointer-events: none;
-}
+/* The language picker fills the sidebar footer; its dropdown auto-flips up. */
+.lang-switch .dd, .lang-switch .dd-trigger { width: 100%; }
 
 #update-btn { position: relative; }
 #update-btn.outdated { color: var(--accent); }
@@ -339,9 +315,10 @@ kbd {
   align-items: center;
   padding: 0 var(--sp-6);
   height: var(--header-h);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: saturate(140%) blur(10px);
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  /* Opaque, not translucent: backdrop-filter repaints this bar on every
+     scroll frame and stutters on weaker GPUs. Without the blur a translucent
+     background would let the cards bleed through the header text. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
@@ -381,7 +358,10 @@ kbd {
   transform: translateY(-50%);
 }
 
-.header-actions { display: flex; gap: var(--sp-2); }
+/* Takes the space the capped search box leaves over, so its children can be
+   distributed across it: the icon buttons stay next to the search field and
+   only .copy-wrap is pushed to the far right. */
+.header-actions { display: flex; gap: var(--sp-2); flex: 1; }
 
 .icon-btn {
   width: 38px; height: 38px;
@@ -429,42 +409,7 @@ kbd {
   gap: var(--sp-3);
 }
 
-.sort-wrap {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.sort-wrap .sort-icon {
-  position: absolute; left: 10px; top: 50%;
-  transform: translateY(-50%);
-  width: 13px; height: 13px;
-  color: var(--text-dim);
-  pointer-events: none;
-}
-.sort-wrap .sort-chev {
-  position: absolute; right: 8px; top: 50%;
-  transform: translateY(-50%);
-  width: 12px; height: 12px;
-  color: var(--text-dim);
-  pointer-events: none;
-}
-.sort-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font: 500 12px var(--ff-ui);
-  padding: 6px 26px 6px 30px;
-  border-radius: var(--r-sm);
-  cursor: pointer;
-  outline: none;
-  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
-}
-.sort-select:hover { background: var(--surface-2); border-color: var(--border-strong); }
-.sort-select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
-.sort-select option { background: var(--surface-2); color: var(--text); }
+.sort-wrap { display: inline-flex; align-items: center; }
 
 /* =========================================================================
    Content
@@ -582,13 +527,19 @@ kbd {
   font-style: normal;
 }
 
+/* The full session id is rendered; how much of it you see is whatever fits on
+   the line. The complete value is in the element's tooltip either way. */
 .card-id {
   font-family: var(--ff-mono);
   font-size: 10.5px;
   color: var(--text-faint);
   letter-spacing: .02em;
-  align-self: flex-start;
+  align-self: stretch;
   margin-top: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-desc {
@@ -689,7 +640,10 @@ kbd {
   border-radius: 999px;
   animation: popIn var(--dur-slow) var(--ease);
 }
-.card.copied .card-id { display: none; }
+/* The hash deliberately stays put while the card shows the copied badge: the
+   badge is absolutely positioned in the top-right corner and the hash is a
+   normal flow child on its own line, so they never overlapped. Hiding it used
+   to change the card's height and made the whole grid twitch on every copy. */
 
 /* =========================================================================
    Bulk select
@@ -751,9 +705,7 @@ body.has-selection .main-sub {
   top: var(--header-h);
   z-index: 9;
   padding: var(--sp-3) var(--sp-6);
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: saturate(140%) blur(10px);
-  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  background: var(--bg);   /* opaque, see .main-header */
   border-bottom: 1px solid var(--border);
 }
 .bulk-count {
@@ -774,7 +726,7 @@ body.has-selection .main-sub {
 /* Honor [hidden] even on flex/grid buttons */
 [hidden] { display: none !important; }
 
-/* Bulk action color variants — own classes to avoid clashing with .btn.warning/.danger */
+/* Bulk action color variants: own classes to avoid clashing with .btn.warning/.danger */
 .bulk-action {
   background: transparent;
   border-color: var(--border-strong);
@@ -878,9 +830,9 @@ body.has-selection .main-sub {
 .modal.hidden { display: none; }
 .modal-backdrop {
   position: absolute; inset: 0;
-  background: rgba(6, 7, 10, .72);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* Darker than it used to be: it no longer has a blur to separate the modal
+     from the page behind it, so the scrim does that work on its own. */
+  background: rgba(6, 7, 10, .82);
 }
 .modal-card {
   position: relative;
@@ -1161,6 +1113,299 @@ body.has-selection .main-sub {
 }
 
 /* =========================================================================
+   Copy-format selector (header)
+   ========================================================================= */
+
+/* margin-left:auto is what pins this, and only this, to the right edge. */
+.copy-wrap { display: inline-flex; align-items: center; gap: var(--sp-2); margin-left: auto; }
+.copy-label {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* =========================================================================
+   Dropdown: custom select, progressive enhancement over a native <select>
+   ========================================================================= */
+
+.dd { position: relative; display: inline-flex; }
+/* The native select stays in the DOM as the source of truth (value, options,
+   i18n) and as the no-JS fallback, but out of sight and out of the tab order:
+   the trigger below carries the accessibility. */
+.dd-native {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.dd-trigger {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  width: 100%;
+  height: 38px;
+  padding: 0 10px 0 11px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font: 500 12.5px var(--ff-ui);
+  cursor: pointer;
+  outline: none;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.dd-trigger:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.dd-trigger:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.dd[data-open="true"] .dd-trigger { background: var(--surface-2); border-color: var(--accent); }
+.dd-lead { width: 14px; height: 14px; color: var(--text-dim); flex-shrink: 0; }
+.dd[data-open="true"] .dd-lead { color: var(--accent); }
+/* Every option is rendered here, stacked into one grid cell: the hidden ghosts
+   size the cell to the longest label, so the trigger keeps a constant width no
+   matter which option is selected. */
+.dd-value {
+  flex: 1;
+  display: grid;
+  text-align: left;
+  min-width: 0;
+}
+.dd-value > * {
+  grid-area: 1 / 1;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dd-value-ghost { visibility: hidden; pointer-events: none; }
+.dd-chev {
+  width: 13px; height: 13px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: transform var(--dur) var(--ease);
+}
+.dd[data-open="true"] .dd-chev { transform: rotate(180deg); }
+
+/* position:fixed so the panel escapes .sidebar's overflow:hidden; JS places it
+   and clamps it to the viewport, and any scroll closes it. */
+.dd-panel {
+  position: fixed;
+  z-index: 90;
+  /* max-width is set by place() in app.js. A CSS 100vw cap would count the
+     scrollbar gutter that the JS clamp excludes, and the mismatch is what
+     pushes the panel off-screen on a narrow window. */
+  padding: var(--sp-1);
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: 2px;
+  animation: popIn var(--dur) var(--ease);
+}
+.dd-panel[hidden] { display: none; }
+.dd-option {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  gap: 2px var(--sp-2);
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  color: var(--text-muted);
+  font: 500 12.5px var(--ff-ui);
+  text-align: left;
+  cursor: pointer;
+  outline: none;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.dd-option:hover { background: var(--surface-3); color: var(--text); }
+.dd-option:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); color: var(--text); }
+.dd-option[aria-selected="true"] { background: var(--accent-dim); border-color: var(--accent-ring); color: var(--text); }
+.dd-check {
+  grid-column: 1; grid-row: 1 / -1;
+  align-self: center;
+  width: 14px; height: 14px;
+  color: var(--accent);
+  opacity: 0;
+}
+.dd-option[aria-selected="true"] .dd-check { opacity: 1; }
+.dd-option-label { grid-column: 2; }
+.dd-option-hint {
+  grid-column: 2;
+  font-family: var(--ff-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.dd-option[aria-selected="true"] .dd-option-hint { color: var(--accent); }
+
+/* =========================================================================
+   Copy-format modal ("ask every time")
+   ========================================================================= */
+
+.copy-card {
+  width: min(720px, calc(100vw - 32px));
+  padding: var(--sp-6);
+  /* Tight by default so the title and its explanation read as one block; the
+     breathing room is added back only before the options, where the gap
+     actually separates something. */
+  gap: var(--sp-2);
+}
+.copy-intro { margin: 0; font-size: 13.5px; color: var(--text-muted); line-height: 1.55; }
+/* One per row: two columns cannot fit a 44-character command in a monospace
+   face, and a grid item does not shrink below its content, so the command
+   spilled outside the card. */
+.copy-options {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--sp-3);
+  margin-top: var(--sp-3);
+}
+.copy-option {
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  min-width: 0;   /* let the command block shrink instead of pushing the card wider */
+  text-align: left;
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              transform var(--dur-fast) var(--ease);
+}
+.copy-option:hover { background: var(--surface-2); border-color: var(--accent-ring); transform: translateY(-2px); }
+.copy-option:active { transform: translateY(0) scale(.99); }
+.copy-option:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; border-color: var(--accent); }
+.copy-option-head { display: flex; align-items: center; gap: var(--sp-3); }
+.copy-option-ic {
+  flex-shrink: 0;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: var(--r-md);
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-ring);
+}
+.copy-option-ic .icon { width: 17px; height: 17px; }
+.copy-option-title { font-size: 14.5px; font-weight: 600; }
+.copy-option-cmd {
+  display: block;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--ff-mono);
+  font-size: 12.5px;
+  color: var(--accent);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+.copy-option-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+
+/* =========================================================================
+   Manual-update modal
+   ========================================================================= */
+
+.manual-card { width: min(600px, calc(100vw - 32px)); padding: var(--sp-6); gap: var(--sp-4); }
+.manual-head { display: flex; align-items: center; gap: var(--sp-3); }
+.manual-head h2 { font-size: 15.5px; }
+.manual-icon {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: var(--r-md);
+  background: var(--favorite-dim);
+  color: var(--favorite);
+  border: 1px solid rgba(242, 184, 75, .35);
+}
+.manual-icon .icon { width: 18px; height: 18px; }
+.manual-body { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-muted); }
+
+.manual-cmd {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+/* Wraps rather than scrolls: this command is the whole point of the modal, so
+   it has to be readable in full without dragging a scrollbar. */
+.manual-cmd code {
+  flex: 1;
+  min-width: 0;
+  padding-top: 5px;
+  font-family: var(--ff-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--accent);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.manual-cmd .btn { flex-shrink: 0; }
+
+.manual-detail { font-size: 12px; }
+.manual-detail[hidden] { display: none; }
+.manual-detail summary {
+  cursor: pointer;
+  color: var(--text-dim);
+  padding: 2px 0;
+  list-style-position: inside;
+}
+.manual-detail summary:hover { color: var(--text-muted); }
+.manual-detail pre {
+  margin: var(--sp-2) 0 0;
+  padding: var(--sp-3);
+  max-height: 180px;
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-family: var(--ff-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* =========================================================================
+   First-run coach mark
+   ========================================================================= */
+
+.coach {
+  position: fixed;
+  z-index: 95;             /* above the dropdown panel, below the modals */
+  width: min(320px, calc(100vw - 24px));
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  background: var(--surface-2);
+  border: 1px solid var(--accent-ring);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  animation: popIn var(--dur-slow) var(--ease);
+}
+.coach.hidden { display: none; }
+.coach h3 { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.coach p { margin: 0; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); }
+.coach code {
+  font-size: 11.5px;
+  color: var(--accent);
+  background: var(--bg);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+}
+.coach .btn { align-self: flex-end; }
+/* The pointer. Positioned by JS along the top edge, under the target. */
+.coach-arrow {
+  position: absolute;
+  top: -7px;
+  width: 12px; height: 12px;
+  background: var(--surface-2);
+  border-left: 1px solid var(--accent-ring);
+  border-top: 1px solid var(--accent-ring);
+  transform: rotate(45deg);
+}
+/* Ring on the control the coach mark is pointing at, so the eye lands there. */
+.dd.coach-target .dd-trigger {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-ring);
+}
+
+/* =========================================================================
    Responsive
    ========================================================================= */
 
@@ -1185,6 +1430,9 @@ body.has-selection .main-sub {
   }
   .mobile-menu { display: grid; }
   .main-header { padding: 0 var(--sp-4); }
+  /* Header gets tight, so the trigger keeps its icon and the word "Copy:" goes. */
+  .copy-label { display: none; }
+  .copy-wrap .dd-value { max-width: 130px; }
   .main-sub { padding: var(--sp-3) var(--sp-4) 0; }
   .content { padding: var(--sp-4); }
   .grid { grid-template-columns: 1fr; }

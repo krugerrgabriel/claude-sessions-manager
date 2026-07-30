@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Claude Sessions — uninstaller
+# Claude Sessions: uninstaller
 #
 # Usage:
 #   sudo ./uninstall.sh              # removes Apache config, asks before deleting files

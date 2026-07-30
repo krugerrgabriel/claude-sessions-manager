@@ -39,6 +39,7 @@
       <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></symbol>
       <symbol id="i-sort" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></symbol>
       <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></symbol>
+      <symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
       <symbol id="i-move" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2"></path><path d="M2 13h10"></path><path d="m9 16 3-3-3-3"></path></symbol>
     </defs>
   </svg>
@@ -66,17 +67,17 @@
           <button class="nav-item active" data-filter="all" type="button">
             <svg class="icon"><use href="#i-inbox"></use></svg>
             <span data-i18n="nav.all">Todas</span>
-            <span class="nav-count" data-count="all">—</span>
+            <span class="nav-count" data-count="all">·</span>
           </button>
           <button class="nav-item" data-filter="favorites" type="button">
             <svg class="icon"><use href="#i-star"></use></svg>
             <span data-i18n="nav.favorites">Favoritas</span>
-            <span class="nav-count" data-count="favorites">—</span>
+            <span class="nav-count" data-count="favorites">·</span>
           </button>
           <button class="nav-item" data-filter="trash" type="button">
             <svg class="icon"><use href="#i-trash"></use></svg>
             <span data-i18n="nav.trash">Lixeira</span>
-            <span class="nav-count" data-count="trash">—</span>
+            <span class="nav-count" data-count="trash">·</span>
           </button>
         </div>
 
@@ -124,6 +125,19 @@
           <button id="refresh" class="icon-btn" data-i18n-tooltip="header.refresh" data-i18n-aria="header.refresh" data-tooltip="Recarregar sessões" aria-label="Recarregar sessões" type="button">
             <svg class="icon"><use href="#i-refresh"></use></svg>
           </button>
+
+          <!-- Last item in the header: sits at the far right edge, so its
+               dropdown panel is right-aligned to stay inside the viewport. -->
+          <div class="copy-wrap">
+            <span class="copy-label" data-i18n="copy.label">Copiar:</span>
+            <!-- Enhanced into a custom dropdown by app.js; the select stays as
+                 the source of truth (value + i18n) and as the no-JS fallback. -->
+            <select id="copy-mode" data-i18n-aria="copy.label" aria-label="Formato do comando copiado">
+              <option value="terminal" data-i18n="copy.mode.terminal">Comando de terminal</option>
+              <option value="inline" data-i18n="copy.mode.inline">Comando dentro do Claude</option>
+              <option value="ask" data-i18n="copy.mode.ask">Perguntar sempre</option>
+            </select>
+          </div>
         </div>
       </header>
 
@@ -135,8 +149,7 @@
         </div>
         <div class="sub-right">
           <div class="sort-wrap">
-            <svg class="icon sort-icon" aria-hidden="true"><use href="#i-sort"></use></svg>
-            <select id="sort-select" class="sort-select" data-i18n-aria="sort.label" aria-label="Ordenar sessões">
+            <select id="sort-select" data-i18n-aria="sort.label" aria-label="Ordenar sessões">
               <option value="recent" data-i18n="sort.recent">Mais recentes</option>
               <option value="oldest" data-i18n="sort.oldest">Mais antigas</option>
               <option value="tokens-desc" data-i18n="sort.tokens-desc">Maior contexto</option>
@@ -144,7 +157,6 @@
               <option value="size-desc" data-i18n="sort.size-desc">Maior tamanho</option>
               <option value="name" data-i18n="sort.name">Nome (A-Z)</option>
             </select>
-            <svg class="icon sort-chev" aria-hidden="true"><use href="#i-chevron-down"></use></svg>
           </div>
           <div class="result-count" id="result-count"></div>
         </div>
@@ -265,6 +277,80 @@
         </button>
       </div>
     </div>
+  </div>
+
+  <!-- Copy-format chooser (only in "ask every time" mode) -->
+  <div id="copy-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-copy-close></div>
+    <div class="modal-card copy-card" role="dialog" aria-modal="true" aria-labelledby="copy-title">
+      <div class="modal-head">
+        <h2 id="copy-title" data-i18n="copy.ask.title">Como você quer copiar?</h2>
+        <button class="icon-btn" data-copy-close data-i18n-aria="modal.close" aria-label="Fechar" type="button">
+          <svg class="icon"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <p class="copy-intro" data-i18n="copy.ask.intro">Os dois retomam a mesma conversa, muda só onde você vai colar.</p>
+      <div class="copy-options">
+        <button class="copy-option" type="button" data-mode="terminal">
+          <span class="copy-option-head">
+            <span class="copy-option-ic"><svg class="icon"><use href="#i-terminal"></use></svg></span>
+            <span class="copy-option-title" data-i18n="copy.ask.terminal.title">Comando de terminal</span>
+          </span>
+          <code class="copy-option-cmd" data-cmd="terminal"></code>
+          <span class="copy-option-desc" data-i18n="copy.ask.terminal.desc">Para colar no terminal, com o Claude Code fechado. Abre esta conversa numa sessão nova.</span>
+        </button>
+        <button class="copy-option" type="button" data-mode="inline">
+          <span class="copy-option-head">
+            <span class="copy-option-ic"><svg class="icon"><use href="#i-message"></use></svg></span>
+            <span class="copy-option-title" data-i18n="copy.ask.inline.title">Comando dentro do Claude</span>
+          </span>
+          <code class="copy-option-cmd" data-cmd="inline"></code>
+          <span class="copy-option-desc" data-i18n="copy.ask.inline.desc">Para colar num Claude Code já aberto. Troca para esta conversa sem fechar a sessão atual.</span>
+        </button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" data-copy-close data-i18n="btn.cancel" type="button">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shown when an update cannot be applied from here and needs the terminal. -->
+  <div id="manual-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-manual-close></div>
+    <div class="modal-card manual-card" role="dialog" aria-modal="true" aria-labelledby="manual-title">
+      <div class="modal-head">
+        <div class="manual-head">
+          <span class="manual-icon"><svg class="icon"><use href="#i-terminal"></use></svg></span>
+          <h2 id="manual-title" data-i18n="update.manual.title">Esta atualização precisa do terminal</h2>
+        </div>
+        <button class="icon-btn" data-manual-close data-i18n-aria="modal.close" aria-label="Fechar" type="button">
+          <svg class="icon"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <p class="manual-body" id="manual-body" data-i18n="update.manual.body">Esta versão muda o instalador ou a configuração do servidor, e isso exige permissão de administrador. Rode o comando abaixo no terminal.</p>
+      <div class="manual-cmd">
+        <code id="manual-command"></code>
+        <button class="btn" id="manual-copy" type="button">
+          <svg class="icon"><use href="#i-copy"></use></svg>
+          <span data-i18n="update.manual.copyBtn">Copiar comando</span>
+        </button>
+      </div>
+      <details class="manual-detail" id="manual-detail-wrap">
+        <summary data-i18n="update.manual.detailLabel">Detalhes técnicos</summary>
+        <pre id="manual-detail"></pre>
+      </details>
+      <div class="modal-actions">
+        <button class="btn primary" data-manual-close type="button" data-i18n="update.manual.close">Entendi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- First-run coach mark for the copy-format picker. Shown once, ever. -->
+  <div id="coach" class="coach hidden" role="dialog" aria-labelledby="coach-title" aria-describedby="coach-body">
+    <div class="coach-arrow" aria-hidden="true"></div>
+    <h3 id="coach-title" data-i18n="coach.copy.title">Novo: escolha como copiar</h3>
+    <p id="coach-body" data-i18n-html="coach.copy.body">Este seletor decide o que vai para o clipboard ao copiar uma conversa.</p>
+    <button id="coach-ok" class="btn primary" type="button" data-i18n="coach.copy.btn">Entendi</button>
   </div>
 
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
