@@ -1558,6 +1558,146 @@
     });
   }
 
+  // ----- What's New -----
+  const WHATSNEW_SEEN = 'cs:whatsNewSeen';        // version whose notes were opened
+  const WHATSNEW_GREETED = 'cs:whatsNewGreeted';  // version that already got the loud state
+
+  // Minimal markdown, covering the subset GitHub release notes actually use.
+  // Every fragment is escaped BEFORE any tag is introduced, so nothing in the
+  // notes can inject markup, and links are restricted to http(s).
+  function renderMarkdown(md) {
+    const inline = (s) => escapeHtml(s)
+      .replace(/`([^`]+)`/g, (_, c) => `<code>${c}</code>`)
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^\w*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+        (_, txt, url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`);
+
+    const out = [];
+    let para = [], list = null, code = null;
+    const flushPara = () => { if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; } };
+    const flushList = () => {
+      if (list) { out.push(`<ul>${list.map(i => `<li>${inline(i)}</li>`).join('')}</ul>`); list = null; }
+    };
+
+    for (const raw of String(md || '').replace(/\r\n/g, '\n').split('\n')) {
+      if (code !== null) {
+        if (/^\s*```/.test(raw)) { out.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`); code = null; }
+        else code.push(raw);
+        continue;
+      }
+      if (/^\s*```/.test(raw)) { flushPara(); flushList(); code = []; continue; }
+      const h = raw.match(/^(#{1,6})\s+(.*)$/);
+      if (h) {
+        flushPara(); flushList();
+        const lvl = Math.min(Math.max(h[1].length, 2), 4);
+        out.push(`<h${lvl}>${inline(h[2])}</h${lvl}>`);
+        continue;
+      }
+      if (/^\s*(---+|\*\*\*+)\s*$/.test(raw)) { flushPara(); flushList(); out.push('<hr>'); continue; }
+      const li = raw.match(/^\s*[-*]\s+(.*)$/);
+      if (li) { flushPara(); (list = list || []).push(li[1]); continue; }
+      if (!raw.trim()) { flushPara(); flushList(); continue; }
+      // An indented line under a bullet continues that bullet.
+      if (list) { list[list.length - 1] += ' ' + raw.trim(); continue; }
+      para.push(raw.trim());
+    }
+    if (code !== null) out.push(`<pre><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+    flushPara(); flushList();
+    return out.join('');
+  }
+
+  // Notes ship with the app, one file per language, so they arrive in the
+  // language the user picked and work with no network at all. The GitHub
+  // release body is the last resort, for a version whose notes were never
+  // shipped alongside it.
+  async function fetchReleaseNotes(version, lang) {
+    const releaseUrl = `https://github.com/${GITHUB_REPO}/releases/tag/v${version}`;
+    for (const code of [lang, 'en']) {
+      if (!code) continue;
+      try {
+        const res = await fetch(`notes/${encodeURIComponent(version)}/${encodeURIComponent(code)}.md`);
+        if (!res.ok) continue;
+        const body = await res.text();
+        if (body.trim()) return { version, lang: code, body, url: releaseUrl };
+      } catch (_) { /* fall through to the next source */ }
+    }
+    // Tag naming is not consistent across this repo's history (1.3.1, v1.4.0),
+    // so try both spellings before giving up.
+    for (const tag of [`v${version}`, version]) {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/tags/${encodeURIComponent(tag)}`);
+        if (!res.ok) continue;
+        const j = await res.json();
+        return { version, lang: 'en', body: j.body || '', url: j.html_url || releaseUrl };
+      } catch (_) { /* try the next spelling */ }
+    }
+    return null;
+  }
+
+  // quiet  = already read
+  // loud   = first page load on a freshly installed version
+  // subtle = unread, but the loud greeting already happened on an earlier load
+  function whatsNewState(version) {
+    if (!version) return 'quiet';
+    try {
+      if (localStorage.getItem(WHATSNEW_SEEN) === version) return 'quiet';
+      if (localStorage.getItem(WHATSNEW_GREETED) !== version) {
+        // Claim the greeting now, so the next refresh already finds it claimed.
+        localStorage.setItem(WHATSNEW_GREETED, version);
+        return 'loud';
+      }
+      return 'subtle';
+    } catch (_) { return 'quiet'; }
+  }
+
+  async function openWhatsNew(version) {
+    const modal = $('#whatsnew-modal');
+    const body = $('#whatsnew-body');
+    const link = $('#whatsnew-link');
+    $('#whatsnew-title').textContent = t('whatsNew.title', { v: version || '' });
+    body.innerHTML = `<p class="whatsnew-state">${escapeHtml(t('whatsNew.loading'))}</p>`;
+    link.href = `https://github.com/${GITHUB_REPO}/releases`;
+
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+
+    // Opening counts as reading: the marker never comes back for this version.
+    try { localStorage.setItem(WHATSNEW_SEEN, version || ''); } catch (_) {}
+    const btn = $('#whats-new-btn');
+    if (btn) btn.dataset.state = 'quiet';
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      modal.removeEventListener('click', onClick);
+      document.removeEventListener('keydown', onKey, true);
+    };
+    const onClick = (e) => { if (e.target.closest('[data-whatsnew-close]')) cleanup(); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); cleanup(); } };
+    modal.addEventListener('click', onClick);
+    document.addEventListener('keydown', onKey, true);
+
+    const data = await fetchReleaseNotes(version, state.lang);
+    if (modal.classList.contains('hidden')) return;   // closed while loading
+    body.innerHTML = data && data.body
+      ? renderMarkdown(data.body)
+      : `<p class="whatsnew-state">${escapeHtml(t('whatsNew.error'))}</p>`;
+    if (data && data.url) link.href = data.url;
+    body.scrollTop = 0;
+    // Deliberately not focused: it is reachable with Tab for keyboard
+    // scrolling, but focusing it on open paints a ring around the whole
+    // article, which reads as an error state.
+  }
+
+  async function setupWhatsNew() {
+    const btn = $('#whats-new-btn');
+    if (!btn) return;
+    const version = await fetchLocalVersion();
+    btn.dataset.state = whatsNewState(version);
+    btn.addEventListener('click', () => openWhatsNew(version));
+  }
+
   // ----- First-run coach mark -----
   // Points at the copy-format picker once, the first time this build is
   // opened, and never again. The key is new, so existing users get it too.
@@ -1638,6 +1778,7 @@
     setupDropdowns();
     syncLangButtons();
     wireUpdateButton();
+    setupWhatsNew();
     load();
     checkForUpdates();
     // After layout settles, so the balloon anchors to the final header position.

@@ -139,5 +139,11 @@
   "update.manual.detailLabel": "기술 세부 정보",
   "update.manual.close": "알겠습니다",
   "update.applying": "업데이트 중...",
-  "update.done": "{v}(으)로 업데이트했습니다. 새로고침 중..."
+  "update.done": "{v}(으)로 업데이트했습니다. 새로고침 중...",
+  "whatsNew.button": "새로운 기능",
+  "whatsNew.title": "{v}의 새로운 기능",
+  "whatsNew.loading": "릴리스 노트를 불러오는 중...",
+  "whatsNew.error": "이 버전의 노트를 불러오지 못했습니다.",
+  "whatsNew.onGitHub": "GitHub에서 보기",
+  "whatsNew.close": "닫기"
 }

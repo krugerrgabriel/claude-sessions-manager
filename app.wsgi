@@ -490,6 +490,61 @@ def _copy_atomic(src, dst):
         raise
 
 
+_ASSET_STAMP = re.compile(r'((?:href|src)="(?:style\.css|app\.js))(\?v=[^"]*)?"')
+_CONF_HEREDOC = re.compile(r'cat > "\$CONF_FILE" <<EOF\n(.*?)\nEOF\n', re.S)
+_A2EN = re.compile(r'^\s*a2en\w+\s+.*$', re.M)
+
+
+def _root_surface(installer_bytes):
+    """The parts of install.sh that actually need root.
+
+    Namely the generated Apache config and the module enables. Everything else
+    in the installer, copying files, printing progress, is work the dashboard
+    already does for itself during a self-update, so a change there is no
+    reason to send the user to a terminal.
+
+    Falls back to the whole file when the config block cannot be located, which
+    errs toward asking for the terminal rather than silently skipping a change
+    that did need it."""
+    try:
+        text = installer_bytes.decode('utf-8')
+    except (UnicodeDecodeError, AttributeError):
+        return installer_bytes
+    m = _CONF_HEREDOC.search(text)
+    if not m:
+        return installer_bytes
+    return '\n'.join([m.group(1)] + _A2EN.findall(text)).encode('utf-8')
+
+
+def _stamp_assets(index_html, version):
+    """Append ?v=<version> to the stylesheet and script URLs.
+
+    Apache sends no Cache-Control for these, so browsers cache them
+    heuristically for days; a stamped URL is one such a cache has never seen,
+    which is what stops an update from rendering with the previous release's
+    CSS. The reload after a self-update revalidates index.html itself, so the
+    new stamps are picked up.
+
+    The repo copy stays unstamped, so this runs on every update rather than
+    shipping a stamp that would go stale. Idempotent: an existing stamp is
+    replaced, not stacked."""
+    try:
+        html = index_html.read_text(encoding='utf-8')
+    except OSError:
+        return
+    stamped = _ASSET_STAMP.sub(lambda m: f'{m.group(1)}?v={version}"', html)
+    if stamped != html:
+        tmp = index_html.with_name(f'{index_html.name}.stamp.tmp')
+        try:
+            tmp.write_text(stamped, encoding='utf-8')
+            os.replace(tmp, index_html)
+        except OSError:
+            try:
+                tmp.unlink()
+            except Exception:
+                pass
+
+
 def _git(args, cwd, timeout=120):
     p = subprocess.run(['git', '-C', str(cwd)] + args,
                        capture_output=True, text=True, timeout=timeout)
@@ -529,16 +584,17 @@ def self_update(src_dir):
                          'detail': 'The clone has uncommitted changes:\n' + out}
 
         installer = src / 'install.sh'
-        before = installer.read_bytes() if installer.exists() else b''
+        before = _root_surface(installer.read_bytes() if installer.exists() else b'')
 
         rc, out = _git(['pull', '--ff-only'], src)
         if rc != 0:
             return 409, {'ok': False, 'reason': 'git', 'detail': out, 'command': command}
 
-        if (installer.read_bytes() if installer.exists() else b'') != before:
+        if _root_surface(installer.read_bytes() if installer.exists() else b'') != before:
             # The pull already landed, so only the installer is still pending.
             return 409, {'ok': False, 'reason': 'installer', 'command': command,
-                         'detail': 'install.sh changed in this release.'}
+                         'detail': 'The Apache configuration changed in this '
+                                   'release, which needs root.'}
 
         if src.resolve() != BASE.resolve():
             for name in INSTALL_FILES:
@@ -550,11 +606,20 @@ def self_update(src_dir):
                 (BASE / 'i18n').mkdir(exist_ok=True)
                 for f in i18n_src.glob('*.json'):
                     _copy_atomic(f, BASE / 'i18n' / f.name)
+            # Release notes, nested one directory per version.
+            notes_src = src / 'notes'
+            if notes_src.is_dir():
+                for f in notes_src.rglob('*.md'):
+                    dst = BASE / 'notes' / f.relative_to(notes_src)
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    _copy_atomic(f, dst)
 
         try:
             version = (BASE / 'VERSION').read_text(encoding='utf-8').strip()
         except OSError:
             version = ''
+        if version:
+            _stamp_assets(BASE / 'index.html', version)
         return 200, {'ok': True, 'version': version}
     except subprocess.TimeoutExpired:
         return 409, {'ok': False, 'reason': 'git', 'command': command,

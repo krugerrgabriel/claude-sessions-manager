@@ -139,5 +139,11 @@
   "update.manual.detailLabel": "Technical details",
   "update.manual.close": "Got it",
   "update.applying": "Updating...",
-  "update.done": "Updated to {v}. Reloading..."
+  "update.done": "Updated to {v}. Reloading...",
+  "whatsNew.button": "What's new",
+  "whatsNew.title": "What's new in {v}",
+  "whatsNew.loading": "Loading the release notes...",
+  "whatsNew.error": "Could not load the notes for this version.",
+  "whatsNew.onGitHub": "View on GitHub",
+  "whatsNew.close": "Close"
 }

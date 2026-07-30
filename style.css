@@ -1297,6 +1297,123 @@ body.has-selection .main-sub {
 .copy-option-desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
 
 /* =========================================================================
+   What's New button + modal
+   ========================================================================= */
+
+/* Three states, set by app.js from the installed version:
+   quiet  = already read
+   subtle = unread, but the loud greeting already happened on an earlier load
+   loud   = first load on a freshly installed version */
+.whats-new {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.whats-new-dot {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: var(--accent);
+  justify-self: end;
+  opacity: 0;
+  transition: opacity var(--dur) var(--ease);
+}
+.whats-new[data-state="subtle"] .icon:first-of-type,
+.whats-new[data-state="loud"] .icon:first-of-type { color: var(--accent); }
+.whats-new[data-state="subtle"] .whats-new-dot,
+.whats-new[data-state="loud"] .whats-new-dot { opacity: 1; }
+
+@keyframes whats-new-sheen {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 87, 0); }
+  50%      { box-shadow: 0 0 0 3px var(--accent-ring); }
+}
+.whats-new[data-state="loud"] {
+  background: var(--accent-dim);
+  color: var(--text);
+  animation: whats-new-sheen 2.4s ease-in-out infinite;
+}
+.whats-new[data-state="loud"] .whats-new-dot { animation: pulse-badge 1.8s ease-in-out infinite; }
+
+/* Height follows the content: short notes make a short modal, long ones grow
+   until they hit this cap, which leaves a margin above and below the card. */
+.whatsnew-card {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - var(--sp-10) * 2);
+  padding: var(--sp-6);
+  gap: var(--sp-4);
+}
+.whatsnew-head { display: flex; align-items: center; gap: var(--sp-3); }
+.whatsnew-head h2 { font-size: 15.5px; }
+.whatsnew-icon {
+  flex-shrink: 0;
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: var(--r-md);
+  background: var(--accent-dim);
+  color: var(--accent);
+  border: 1px solid var(--accent-ring);
+}
+.whatsnew-icon .icon { width: 18px; height: 18px; }
+
+/* Rendered release markdown. Scrolls on its own so the modal never grows past
+   the viewport on a long changelog. */
+.whatsnew-body {
+  /* min-height:0 lets this flex child shrink below its content so the card's
+     max-height wins and the scrolling happens here, not on the page. */
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: var(--sp-3);
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.whatsnew-body::-webkit-scrollbar { width: 8px; }
+.whatsnew-body::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 10px; }
+.whatsnew-body:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 4px; }
+.whatsnew-body h2, .whatsnew-body h3, .whatsnew-body h4 {
+  margin: var(--sp-5) 0 var(--sp-2);
+  color: var(--text);
+  line-height: 1.35;
+}
+.whatsnew-body > :first-child { margin-top: 0; }
+.whatsnew-body h2 { font-size: 15px; }
+.whatsnew-body h3 { font-size: 14px; }
+.whatsnew-body h4 { font-size: 13.5px; color: var(--accent); }
+.whatsnew-body p { margin: 0 0 var(--sp-3); }
+.whatsnew-body ul { margin: 0 0 var(--sp-3); padding-left: var(--sp-5); }
+.whatsnew-body li { margin-bottom: 6px; }
+.whatsnew-body strong { color: var(--text); font-weight: 600; }
+.whatsnew-body a { color: var(--accent); text-decoration: none; }
+.whatsnew-body a:hover { text-decoration: underline; }
+.whatsnew-body code {
+  font-family: var(--ff-mono);
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: var(--r-xs);
+}
+.whatsnew-body pre {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+}
+.whatsnew-body pre code { background: none; border: 0; padding: 0; font-size: 12px; color: var(--accent); }
+.whatsnew-body hr { border: 0; border-top: 1px solid var(--border); margin: var(--sp-4) 0; }
+.whatsnew-state { color: var(--text-dim); }
+
+/* =========================================================================
    Manual-update modal
    ========================================================================= */
 

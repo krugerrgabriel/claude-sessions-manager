@@ -139,5 +139,11 @@
   "update.manual.detailLabel": "Technische Details",
   "update.manual.close": "Verstanden",
   "update.applying": "Aktualisiere...",
-  "update.done": "Auf {v} aktualisiert. Lade neu..."
+  "update.done": "Auf {v} aktualisiert. Lade neu...",
+  "whatsNew.button": "Neuerungen",
+  "whatsNew.title": "Neuerungen in {v}",
+  "whatsNew.loading": "Release Notes werden geladen...",
+  "whatsNew.error": "Die Notes für diese Version konnten nicht geladen werden.",
+  "whatsNew.onGitHub": "Auf GitHub ansehen",
+  "whatsNew.close": "Schließen"
 }

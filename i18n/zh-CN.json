@@ -139,5 +139,11 @@
   "update.manual.detailLabel": "技术细节",
   "update.manual.close": "知道了",
   "update.applying": "正在更新...",
-  "update.done": "已更新到 {v}。正在重新加载..."
+  "update.done": "已更新到 {v}。正在重新加载...",
+  "whatsNew.button": "更新内容",
+  "whatsNew.title": "{v} 的更新内容",
+  "whatsNew.loading": "正在加载版本说明...",
+  "whatsNew.error": "无法加载此版本的说明。",
+  "whatsNew.onGitHub": "在 GitHub 上查看",
+  "whatsNew.close": "关闭"
 }
