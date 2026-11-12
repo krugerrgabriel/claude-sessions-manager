@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 # Serializes read-modify-write on metadata.json. WSGIDaemonProcess runs this
@@ -38,6 +39,11 @@ PROJECTS_DIR = Path(
 )
 META_FILE = BASE / 'data' / 'metadata.json'
 CACHE_FILE = BASE / 'cache' / 'sessions.json'
+SETTINGS_FILE = BASE / 'data' / 'settings.json'
+
+# 0 = off. Upper bound only guards against typos turning into nonsense.
+SETTINGS_DEFAULTS = {'auto_trash_days': 0}
+AUTO_TRASH_MAX_DAYS = 3650
 
 # The git clone this was installed from, recorded by install.sh as a SetEnv.
 # Apache's SetEnv lands in the per-request WSGI environ rather than the
@@ -107,6 +113,71 @@ def load_metadata():
 
 def save_metadata(data):
     _write_json_atomic(META_FILE, data)
+
+
+def load_settings():
+    data = _read_json(SETTINGS_FILE, {})
+    if not isinstance(data, dict):
+        data = {}
+    out = dict(SETTINGS_DEFAULTS)
+    try:
+        days = int(data.get('auto_trash_days', 0))
+    except (TypeError, ValueError):
+        days = 0
+    out['auto_trash_days'] = max(0, min(days, AUTO_TRASH_MAX_DAYS))
+    return out
+
+
+def save_settings(data):
+    _write_json_atomic(SETTINGS_FILE, data)
+
+
+def _inactive_since(session_mtime, meta):
+    """Last moment the user showed interest in a session: its last write, or
+    the last time they pulled it out of the trash by hand. Without the second
+    one, restoring an old session would send it straight back next refresh."""
+    kept = meta.get('kept_at') or 0
+    return max(session_mtime, kept if isinstance(kept, (int, float)) else 0)
+
+
+def apply_auto_trash(sessions):
+    """Move sessions idle longer than the configured window to the trash, and
+    bring back ones that were auto-trashed but have been used since.
+
+    Only flips the soft-delete flag; nothing is removed from disk. Favorites
+    are never touched. Returns how many sessions were trashed by this call."""
+    days = load_settings()['auto_trash_days']
+    now = time.time()
+    cutoff = now - days * 86400
+    trashed = 0
+    with _META_LOCK:
+        try:
+            metadata = load_metadata()
+        except MetadataUnreadable:
+            return 0   # never write over a file we could not read
+        changed = False
+        for s in sessions:
+            meta = metadata.get(s['id'], {})
+            auto_at = meta.get('auto_trashed_at')
+            if s['deleted'] and auto_at and s['mtime'] > auto_at:
+                # Resumed after the dashboard trashed it: it is in use again.
+                meta['deleted'] = False
+                meta.pop('auto_trashed_at', None)
+                s['deleted'] = False
+                metadata[s['id']] = meta
+                changed = True
+            elif (days and not s['deleted'] and not s['favorite']
+                  and _inactive_since(s['mtime'], meta) < cutoff):
+                meta['deleted'] = True
+                meta['auto_trashed_at'] = now
+                s['deleted'] = True
+                metadata[s['id']] = meta
+                trashed += 1
+                changed = True
+            s['inactive_since'] = _inactive_since(s['mtime'], meta)
+        if changed:
+            save_metadata(metadata)
+    return trashed
 
 
 def load_cache():
@@ -662,10 +733,29 @@ def application(environ, start_response):
     if path in ('/sessions', '/sessions/'):
         if method == 'GET':
             sessions, meta_error = list_sessions()
-            payload = {'sessions': sessions}
+            auto_trashed = 0 if meta_error else apply_auto_trash(sessions)
+            payload = {'sessions': sessions, 'auto_trashed': auto_trashed}
             if meta_error:
                 payload['meta_error'] = meta_error
             return json_response(start_response, payload)
+        return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
+
+    if path in ('/settings', '/settings/'):
+        if method == 'GET':
+            return json_response(start_response, load_settings())
+        if method in ('PUT', 'PATCH', 'POST'):
+            payload = read_body(environ)
+            current = load_settings()
+            if 'auto_trash_days' in payload:
+                try:
+                    days = int(payload['auto_trash_days'])
+                except (TypeError, ValueError):
+                    return json_response(start_response, {'error': 'auto_trash_days must be an integer'}, '400 Bad Request')
+                if days < 0 or days > AUTO_TRASH_MAX_DAYS:
+                    return json_response(start_response, {'error': f'auto_trash_days must be between 0 and {AUTO_TRASH_MAX_DAYS}'}, '400 Bad Request')
+                current['auto_trash_days'] = days
+            save_settings(current)
+            return json_response(start_response, current)
         return json_response(start_response, {'error': 'method not allowed'}, '405 Method Not Allowed')
 
     m_move = re.match(r'^/sessions/([0-9a-fA-F-]{36})/move$', path)
@@ -704,8 +794,13 @@ def application(environ, start_response):
                         elif isinstance(val, str):
                             val = val.strip()
                         entry[key] = val
+                if 'deleted' in payload:
+                    # Any manual trash/restore overrides the automatic one.
+                    entry.pop('auto_trashed_at', None)
+                    if not entry['deleted']:
+                        entry['kept_at'] = time.time()
                 # Drop empty defaults to keep file clean
-                if not entry.get('name') and not entry.get('description') and not entry.get('favorite') and not entry.get('deleted'):
+                if not entry.get('name') and not entry.get('description') and not entry.get('favorite') and not entry.get('deleted') and not entry.get('kept_at'):
                     metadata.pop(sid, None)
                 else:
                     metadata[sid] = entry

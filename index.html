@@ -41,6 +41,7 @@
       <symbol id="i-sort" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M7 12h10"></path><path d="M10 18h4"></path></symbol>
       <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></symbol>
       <symbol id="i-terminal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" x2="20" y1="19" y2="19"></line></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></symbol>
       <symbol id="i-move" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H20a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H2"></path><path d="M2 13h10"></path><path d="m9 16 3-3-3-3"></path></symbol>
     </defs>
   </svg>
@@ -128,6 +129,9 @@
             <svg class="icon"><use href="#i-download"></use></svg>
             <span class="update-badge hidden" aria-hidden="true"></span>
           </button>
+          <button id="settings-btn" class="icon-btn" data-i18n-tooltip="settings.title" data-i18n-aria="settings.title" data-tooltip="Configurações" aria-label="Configurações" type="button">
+            <svg class="icon"><use href="#i-settings"></use></svg>
+          </button>
           <button id="refresh" class="icon-btn" data-i18n-tooltip="header.refresh" data-i18n-aria="header.refresh" data-tooltip="Recarregar sessões" aria-label="Recarregar sessões" type="button">
             <svg class="icon"><use href="#i-refresh"></use></svg>
           </button>
@@ -165,6 +169,10 @@
             </select>
           </div>
           <div class="result-count" id="result-count"></div>
+          <button id="empty-trash" class="btn bulk-action bulk-action-danger empty-trash" type="button" hidden>
+            <svg class="icon"><use href="#i-trash"></use></svg>
+            <span data-i18n="trash.emptyAll">Esvaziar lixeira</span>
+          </button>
         </div>
         <div class="bulk-bar" role="toolbar" aria-label="Bulk actions">
           <span class="bulk-count"><span id="bulk-n">0</span> <span id="bulk-noun" data-i18n="bulk.count.plural">selecionadas</span></span>
@@ -255,6 +263,49 @@
       <div class="modal-actions">
         <button class="btn ghost" data-confirm-cancel data-i18n="btn.cancel" type="button">Cancelar</button>
         <button id="confirm-ok" class="btn primary" type="button">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div id="settings-modal" class="modal hidden" aria-hidden="true">
+    <div class="modal-backdrop" data-settings-close></div>
+    <div class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h2 id="settings-title" data-i18n="settings.title">Configurações</h2>
+        <button class="icon-btn" data-settings-close data-i18n-aria="modal.close" aria-label="Fechar" type="button">
+          <svg class="icon"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <section class="settings-section">
+        <div class="settings-row">
+          <div class="settings-text">
+            <h3 data-i18n="settings.autoTrash.title">Lixeira automática</h3>
+            <p data-i18n="settings.autoTrash.desc">Sessões sem uso por esse período vão sozinhas para a lixeira.</p>
+          </div>
+          <select id="auto-trash-days" data-i18n-aria="settings.autoTrash.title" aria-label="Lixeira automática">
+            <option value="0" data-i18n="settings.autoTrash.off">Desativado</option>
+            <option value="7" data-i18n="settings.autoTrash.d7">7 dias</option>
+            <option value="14" data-i18n="settings.autoTrash.d14">14 dias</option>
+            <option value="30" data-i18n="settings.autoTrash.d30">30 dias</option>
+            <option value="60" data-i18n="settings.autoTrash.d60">60 dias</option>
+            <option value="90" data-i18n="settings.autoTrash.d90">90 dias</option>
+            <option value="180" data-i18n="settings.autoTrash.d180">180 dias</option>
+          </select>
+        </div>
+        <p id="auto-trash-preview" class="settings-preview" hidden></p>
+        <ul class="settings-notes">
+          <li data-i18n="settings.autoTrash.noteFav">Favoritas nunca são movidas.</li>
+          <li data-i18n="settings.autoTrash.noteDisk">Nada é apagado do disco: a sessão só vai para a lixeira, de onde dá para restaurar.</li>
+          <li data-i18n="settings.autoTrash.noteResume">Se você retomar uma sessão que foi para a lixeira sozinha, ela volta.</li>
+        </ul>
+      </section>
+      <div class="modal-actions">
+        <button class="btn ghost" data-settings-close data-i18n="btn.cancel" type="button">Cancelar</button>
+        <button id="settings-save" class="btn primary" type="button">
+          <svg class="icon"><use href="#i-check"></use></svg>
+          <span data-i18n="btn.save">Salvar</span>
+        </button>
       </div>
     </div>
   </div>

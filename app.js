@@ -172,6 +172,10 @@
       metaErrorReported = true;
       toast(t('toast.error', { msg: escapeHtml(data.meta_error) }), 'error', { duration: 8000 });
     }
+    if (data.auto_trashed > 0) {
+      const n = data.auto_trashed;
+      toast(t(n === 1 ? 'toast.autoTrashed.one' : 'toast.autoTrashed.many', { n }), '', { duration: 6000, icon: 'trash' });
+    }
     return data.sessions || [];
   }
 
@@ -199,6 +203,26 @@
     return res.json();
   }
 
+  async function fetchSettings() {
+    const res = await fetch(`${API}/settings`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async function saveSettings(patch) {
+    const res = await fetch(`${API}/settings`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { msg = (await res.json()).error || msg; } catch (_) {}
+      throw new Error(msg);
+    }
+    return res.json();
+  }
+
   async function moveSession(id, targetCwd) {
     const res = await fetch(`${API}/sessions/${id}/move`, {
       method: 'POST',
@@ -216,7 +240,7 @@
   // ----- Toast -----
   function toast(msg, type = '', opts = {}) {
     const el = $('#toast');
-    const iconName = type === 'success' ? 'check' : type === 'error' ? 'alert' : 'copy';
+    const iconName = opts.icon || (type === 'success' ? 'check' : type === 'error' ? 'alert' : 'copy');
     el.innerHTML = `${icon(iconName)}<span class="msg">${msg}</span>`;
     el.className = `toast show ${type}`;
     clearTimeout(toast._t);
@@ -830,7 +854,7 @@
     container.innerHTML = html;
   }
 
-  function render() { pruneSelection(); renderSidebar(); renderContent(); renderBulkBar(); }
+  function render() { pruneSelection(); renderSidebar(); renderContent(); renderBulkBar(); renderEmptyTrashBtn(); }
 
   // Drop selected IDs that no longer exist or are not visible under current filter
   function pruneSelection() {
@@ -930,7 +954,22 @@
   }
 
   async function bulkPurge() {
-    const items = selectionItems();
+    await purgeSessions(selectionItems());
+  }
+
+  // Empties the trash as currently scoped: with no project or search filter
+  // that is the whole trash, otherwise only what the user is looking at.
+  async function emptyTrash() {
+    if (state.filter !== 'trash') return;
+    await purgeSessions(visibleSessions());
+  }
+
+  function renderEmptyTrashBtn() {
+    const btn = $('#empty-trash');
+    btn.hidden = state.filter !== 'trash' || visibleSessions().length === 0;
+  }
+
+  async function purgeSessions(items) {
     if (!items.length) return;
     const ok = await confirmDialog({
       title: t('confirm.bulkPurge.title', { n: items.length }),
@@ -1151,6 +1190,71 @@
     }
   }
 
+  // ----- Settings modal -----
+  // Mirrors the backend rule in apply_auto_trash, for the live preview only.
+  function autoTrashCandidates(days) {
+    if (!days) return 0;
+    const cutoff = Date.now() / 1000 - days * 86400;
+    return state.sessions.filter(s =>
+      !s.deleted && !s.favorite && (s.inactive_since || s.mtime) < cutoff
+    ).length;
+  }
+
+  function renderAutoTrashPreview() {
+    const days = Number($('#auto-trash-days').value) || 0;
+    const el = $('#auto-trash-preview');
+    if (!days) { el.hidden = true; return; }
+    const n = autoTrashCandidates(days);
+    el.hidden = false;
+    el.classList.toggle('has-hits', n > 0);
+    el.textContent = n === 0 ? t('settings.autoTrash.previewNone')
+      : t(n === 1 ? 'settings.autoTrash.previewOne' : 'settings.autoTrash.previewMany', { n });
+  }
+
+  async function openSettings() {
+    let current;
+    try { current = await fetchSettings(); }
+    catch (e) { toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error'); return; }
+    const sel = $('#auto-trash-days');
+    const days = String(current.auto_trash_days || 0);
+    // A value set by hand in settings.json may not be one of the presets.
+    if (![...sel.options].some(o => o.value === days)) {
+      const opt = document.createElement('option');
+      opt.value = days;
+      opt.textContent = t('settings.autoTrash.custom', { n: days });
+      sel.appendChild(opt);
+    }
+    sel.value = days;
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    renderAutoTrashPreview();
+    $('#settings-modal').classList.remove('hidden');
+    $('#settings-modal').setAttribute('aria-hidden', 'false');
+    setTimeout(() => $('#settings-modal .dd-trigger, #auto-trash-days')?.focus(), 30);
+  }
+
+  function closeSettings() {
+    $('#settings-modal').classList.add('hidden');
+    $('#settings-modal').setAttribute('aria-hidden', 'true');
+  }
+
+  async function submitSettings() {
+    const days = Number($('#auto-trash-days').value) || 0;
+    const btn = $('#settings-save');
+    btn.disabled = true;
+    try {
+      await saveSettings({ auto_trash_days: days });
+      closeSettings();
+      toast(days ? t('toast.settings.savedOn', { n: days }) : t('toast.settings.savedOff'), 'success');
+      // Apply the new rule right away instead of on the next refresh.
+      state.sessions = await fetchSessions();
+      render();
+    } catch (e) {
+      toast(t('toast.error', { msg: escapeHtml(e.message) }), 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   // ----- Loading -----
   async function load() {
     try {
@@ -1175,6 +1279,9 @@
 
     // Close move modal
     if (ev.target.closest('[data-move-close]')) { closeMoveModal(); return; }
+
+    // Close settings modal
+    if (ev.target.closest('[data-settings-close]')) { closeSettings(); return; }
 
     // Move list item selection
     const moveItem = ev.target.closest('.move-item');
@@ -1263,6 +1370,7 @@
     }
     if (e.key === 'Escape') {
       if (!$('#move-modal').classList.contains('hidden')) { closeMoveModal(); return; }
+      if (!$('#settings-modal').classList.contains('hidden')) { closeSettings(); return; }
       if (!$('#modal').classList.contains('hidden')) { closeEditor(); return; }
       if (state.selected.size > 0) { clearSelection(); return; }
       if ($('#search') === document.activeElement) { $('#search').value = ''; state.query = ''; render(); $('#search').blur(); return; }
@@ -1328,6 +1436,10 @@
   $('#bulk-trash').addEventListener('click', bulkTrash);
   $('#bulk-restore').addEventListener('click', bulkRestore);
   $('#bulk-purge').addEventListener('click', bulkPurge);
+  $('#empty-trash').addEventListener('click', emptyTrash);
+  $('#settings-btn').addEventListener('click', openSettings);
+  $('#settings-save').addEventListener('click', submitSettings);
+  $('#auto-trash-days').addEventListener('change', renderAutoTrashPreview);
   $('#bulk-clear').addEventListener('click', clearSelection);
 
   // Move modal
@@ -1389,6 +1501,7 @@
       hints: { terminal: 'claude --resume', inline: '/resume' },
     });
     enhanceSelect($('#sort-select'), { icon: 'sort' });
+    enhanceSelect($('#auto-trash-days'), { icon: 'clock', align: 'right' });
   }
 
   function syncLangButtons() {
